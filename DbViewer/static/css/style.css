@@ -1,0 +1,86 @@
+.main-container{
+	padding-bottom: 100px;
+	margin: 0px;
+	padding: 60px 20px 0px;
+}
+
+.centered{
+    float: none;
+    margin: 0 auto;
+}
+
+.item-display img{
+	border: solid 1px black;
+}
+
+#page-menu{
+	padding: 10px 0px;
+}
+
+.column{
+	height: 600px;
+	overflow-x: hidden;
+}
+
+#editor{
+	height: 600px;
+	margin-top: 15px;
+}
+
+.tree-panel{
+	overflow-y: auto;
+}
+
+.tree-display{
+	word-wrap: break-word;
+}
+
+ul.jqtree-tree .jqtree-title {
+	color: white !important;
+}
+
+ul.jqtree-tree .jqtree-toggler {
+	color: white !important;
+}
+	
+
+.dl-horizontal dt {
+	width: 90px;
+	padding-top: 6px;
+}
+
+.dl-horizontal dd {
+	margin-left: 100px;
+}
+
+.dl-horizontal dd pre {
+	min-height: 34px;
+}
+
+.filter-form {
+	margin: 10px 0px;
+}
+
+.filter-form select {
+	width: 200px;
+	margin: 0px 20px;
+}
+
+.filter-form label {
+	display: none;
+}
+
+.span-label {
+	font-weight: 900;
+	width: 120px;
+	float: left;
+	padding-top: 5px;
+}
+
+.filter-form .help-block{
+	display: none;
+}
+
+#id_filters {
+	width: 300px;
+}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block body %}   
+<div class="navbar navbar-default navbar-fixed-top hidden-print">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+        {% for item in top_menu %}<span class="icon-bar"></span>{% endfor %}
+      </button>
+      <a class="navbar-brand" href="{% url "main" %}">{{site_title}}</a>
+    </div>
+    <div class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        {% for item in top_menu %}
+		<li class="{{item.class}}"><a href="{{item.url}}">{{item.name}}</a></li>
+		{% endfor %}
+      </ul>
+    </div><!--/.navbar-collapse -->
+</div>
+<div class="main-container">
+	
+	{% if page_menu %}
+	<div id="page-menu" class="hidden-print">
+		{% for item in page_menu %}
+			{% if item.url %}
+				<a href="{{item.url}}" class="btn btn-default {{item.classes}}" msg="{{ item.msg }}">{{item.name}}</a>
+			{% elif item.onclick %}
+				<button type="button" class="btn btn-default" onclick="{{item.onclick}}">{{item.name}}</button>
+			{% endif %}
+		{% endfor %}
+	</div>
+	{% endif %}
+	
+	{% block content %}{% endblock %}
+</div>
+{% endblock body %}

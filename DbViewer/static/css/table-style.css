@@ -1,0 +1,110 @@
+.handsontable td {
+	max-width: 200px;
+}
+
+.handsontable .large_item {
+	max-height: 82px;
+}
+
+#log pre {
+	outline: 1px solid #ccc;
+	padding: 5px;
+	margin: 5px;
+}
+
+#log .string {
+	color: black;
+}
+
+#log .number {
+	color: red;
+}
+
+#log .boolean {
+	color: blue;
+}
+
+#log .null {
+	color: magenta;
+}
+
+#log .key {
+	color: grey;
+}
+
+.padded-row {
+	margin-bottom: 20px;
+}
+
+.bodge-indent {
+	margin-left: 10px;
+}
+
+.error-cell {
+	background-color: #f66 !important;
+}
+
+#error {
+	max-height: 200px;
+	overflow: auto;
+}
+
+.msg-warning-row {
+	min-height: 75px;
+	margin-left: -4px;
+}
+
+.big-modal {
+	width: 900px !important;
+}
+
+.table-modal {
+	height: 500px;
+}
+
+.small-table {
+	padding: 0 50px;
+}
+.big-table {
+	padding-right: 40px;
+}
+
+.handsontable col.rowHeader {
+	width: 26px !important;
+}
+
+.handsontable.htRemoveRow th.htRemoveRow .btn {
+	background-color: #428bca;
+	border-radius: 9px;
+	padding: 0 2px 0 2px;
+	color: #FFF;
+	cursor: pointer;
+	font-size: 11px;
+	font-weight: bold;
+	display: none;
+	margin: 0 auto;
+	width: 13px;
+}
+
+.handsontable.htRemoveRow th.htRemoveRow .btn:hover {
+	background-color: #3071a9;
+}
+
+.handsontable tbody .htRemoveRow + th {
+	border-left-width: 0px;
+}
+
+.cell-button {
+	height: 22px;
+	padding-top: 0px;
+	margin: 1px auto;
+	width: 90%;
+}
+
+.button-cell {
+	text-align: center;
+}
+
+#extra-table-big .handsontable  .horizontal{
+	display: none !important;
+}

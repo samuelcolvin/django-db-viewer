@@ -1,0 +1,64 @@
+{% extends base_template %}
+
+{% block content %}	
+	<div class="row">
+		<div class="col-lg-5 col-xs-12">
+			<form method="post" action="" class="form-inline filter-form" role="form">
+				<input id="sub_type" type="hidden" name="submit_type" value="choose"/>
+			    <legend>Filters</legend>
+				{% load bootstrap %}
+				<div class="well">
+					{% csrf_token %}
+					<span class="span-label">Existing Filters: </span>
+			    	{{ choose_filter |bootstrap }}
+				</div>
+				<div class="well">
+					{% if filter_form_error %}
+						<div style="color: #b94a48; margin-bottom: 10px">{{filter_form_error}}</div>
+					{% endif %}
+					<div>
+						{% csrf_token %}
+						{{ form.non_field_errors.as_ul }}
+						
+						<div style="display:none"> <!---->
+							{{ form.code }}
+						</div>
+						<span class="span-label">Database: </span>
+						{{ form.db |bootstrap }}
+					    <button type="submit" class="btn btn-default" onclick="$('#sub_type').val('edit')">Save &amp; Execute</button>
+					</div>
+				    <div id="editor"></div>
+				</div>
+			</form>
+		</div>
+		
+		<div class="col-lg-7 col-xs-12">
+			<div class="row">
+				<div class="col-md-5 col-xs-12 column">
+					 <legend>Data Tree</legend>
+					<div class="well tree-panel">
+					  <div id="tree" data-url="{% url 'tree_json' %}"></div>
+					</div>
+				</div>
+				
+				<div class="col-md-7 col-xs-12">
+					<div class="tree-display column">
+					  <legend>Data Display</legend>
+					  <dl id="description" class="dl-horizontal"></dl>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+{% endblock %}
+
+{% block extra_css %}
+	{% load staticfiles %}
+	<link rel="stylesheet" href="{% static "css/jqtree.css" %}">
+{% endblock %}
+
+{% block extra_js %}
+	<script src="{% static "js/lib/tree.jquery.js" %}"></script>
+	<script src="{% static "js/lib/ace/ace.js" %}"></script>
+	<script src="{% static "js/tree_display.js" %}"></script>
+{% endblock %}
