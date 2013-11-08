@@ -1,2 +1,2 @@
-from DbInspect.databases import MySql, SqlLite
+from DbInspect.databases import MySql, SqlLite, MongoDb
     

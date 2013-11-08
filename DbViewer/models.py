@@ -1,7 +1,5 @@
 from django.db import models
 
-# Create your models here.
-
 
 class BasicModel(models.Model):
     name = models.CharField(max_length=100)
@@ -12,12 +10,19 @@ class BasicModel(models.Model):
     class Meta:
         abstract = True
 
-class DbType(BasicModel):
-    class_name = models.CharField(unique=True, max_length=100)
+class DbType(models.Model):
+    class_name = models.CharField(unique=True, max_length=100, choices = (
+        ('MySql', 'MySql'), 
+        ('SqlLite', 'SqlLite'),
+        ('MongoDb', 'MongoDb'),))
     filter_format = models.CharField(max_length=50, choices = (
         ('sql', 'SQL'), 
         ('javascript', 'Javascript'),
         ('python', 'Python'),))
+    dft_port = models.IntegerField('Default Port', null=True, blank=True)
+    
+    def __unicode__(self):
+        return self.class_name
     
     class Meta:
         verbose_name_plural = 'Database Types'
@@ -31,6 +36,7 @@ class Database(BasicModel):
     host = models.CharField(max_length=200, default = 'localhost')
     path = models.CharField(max_length=200, null=True, blank=True)
     port = models.IntegerField(null=True, blank=True)
+    port.help_text = 'Leave Blank to use DB type default'
     live = models.BooleanField(default=True)
     
     def conn_values(self):
@@ -43,13 +49,26 @@ class Database(BasicModel):
         d.append(('port', self.port))
         return d
     
-class Filter(models.Model):
-    db = models.ForeignKey(Database, related_name='filters')
+    def save(self, *args, **kw):
+        super(Database, self).save(*args, **kw)
+        if self.port is None:
+            self.port = self.db_type.dft_port
+        super(Database, self).save(*args, **kw)
+    
+class Query(BasicModel):
+    db = models.ForeignKey(Database, related_name='filters',
+                           verbose_name = 'Database')
     code = models.TextField()
+    function = models.CharField(max_length=50, default='dft', choices = (
+        ('dft', 'Default'), 
+        ('find', 'Find (MongoDB Only)'),
+        ('aggregate', 'Aggregate (MongoDB Only)'),
+        ('map_reduce', 'Map/Reduce (MongoDB Only)'),))
     
     def __unicode__(self):
-        c = self.code[:20]
-        if len(self.code) > 20:
-            c += '...'
-        return '%s: %s' % (self.db.name, c)
+        return self.name
+    
+    class Meta:
+        verbose_name_plural = 'Queries'
+        verbose_name = 'Query'
     

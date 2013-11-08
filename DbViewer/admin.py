@@ -2,7 +2,7 @@ from django.contrib import admin
 import DbViewer.models as m
 
 class DbType(admin.ModelAdmin):
-    list_display = ('name', 'class_name')
+    list_display = ('class_name',)
 
 admin.site.register(m.DbType, DbType)
 
@@ -11,7 +11,7 @@ class Database(admin.ModelAdmin):
 
 admin.site.register(m.Database, Database)
 
-class Filter(admin.ModelAdmin):
-    list_display = ('db', 'code')
+class Query(admin.ModelAdmin):
+    list_display = ('name', 'db', 'function', 'code')
 
-admin.site.register(m.Filter, Filter)
+admin.site.register(m.Query, Query)

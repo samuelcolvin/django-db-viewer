@@ -14,7 +14,6 @@ import DbInspect
 from datetime import datetime as dtdt
 from django.core.cache import cache
 from django import forms
-from django.forms.models import modelform_factory
 import django.views.generic.edit as generic_editor
 
 TREE_CACHE_KEY = 'tree_data'
@@ -64,39 +63,55 @@ class ViewBase(object): #generic.TemplateView
         
         self._context['top_menu'] = top_menu
         self._context['site_title'] = settings.SITE_TITLE
+        
+class QueryForm(forms.ModelForm):
+    name = forms.CharField(max_length=100, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'name'}))
+    class Meta:
+        model = m.Query
     
 class FilterChoice(forms.Form):
     def __init__(self, init_val, *args, **kwargs):
         super(FilterChoice, self).__init__(*args, **kwargs)
-        choices = [(-1,'')] + [(f.id, str(f)) for f in m.Filter.objects.all()]
-        self.fields['filters'] = forms.ChoiceField(choices=choices, initial=init_val, label='Choose existing Filter');
+        choices = [(-1,'')] + [(f.id, str(f)) for f in m.Query.objects.all()]
+        self.fields['queries'] = forms.ChoiceField(choices=choices, initial=init_val, label='Existing Queries:');
 
 class Main(ViewBase, generic_editor.TemplateResponseMixin, generic_editor.ModelFormMixin, generic_editor.ProcessFormView):
     template_name = 'main_display.html'
-    form_class = modelform_factory(m.Filter)
+    form_class = QueryForm
     sub_type = None
         
     def post(self, request, *args, **kw):
         self.setup_context(**kw)
-        return super(Main, self).post(request, *args, **kw)
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
+        if self.sub_type == 'delete':
+            return self.delete(form)
+        else:
+            if form.is_valid():
+                return self.form_valid(form)
+            else:
+                return self.form_invalid(form)
     
     def setup_context(self, **kw):
         super(Main, self).setup_context(**kw)
-        fid, mfilter = -1, None
+        qid, query = -1, None
         if 'submit_type' in self.request.POST:
             self.sub_type = self.request.POST['submit_type']
         
-        if 'filters' in self.request.POST and self.request.POST['filters'] != '-1':
-            fid = int(self.request.POST['filters'])
-            mfilter = m.Filter.objects.get(id=int(fid))
-        self._set_mfilter(fid)
-        self.object = mfilter
+        if 'queries' in self.request.POST and self.request.POST['queries'] != '-1':
+            qid = int(self.request.POST['queries'])
+            query = m.Query.objects.get(id=int(qid))
+        self._set_query(qid)
+        self.object = query
 
-    def _set_mfilter(self, fid):
-        self._context['choose_filter'] = FilterChoice(fid)
+    def _set_query(self, qid):
+        self._context['choose_query'] = FilterChoice(qid)
     
     def get_context_data(self, **kw):
         self._context.update(super(Main, self).get_context_data(**kw))
+        values = m.Database.objects.all().values_list('id', 'db_type__filter_format')
+        values = [dict(zip(('id', 'format'), v)) for v in values]
+        self._context['code_formats'] = json.dumps(values)
         return self._context
     
     def get_form_kwargs(self):
@@ -106,9 +121,16 @@ class Main(ViewBase, generic_editor.TemplateResponseMixin, generic_editor.ModelF
         kwargs.update({'instance': self.object})
         return kwargs
     
+    def delete(self, form):
+        if self.object:
+            self.object.delete()
+            self._set_query(self.object.id)
+        form = self.form_class()
+        return self.render_to_response(self.get_context_data(form=form))
+    
     def form_valid(self, form):
         self.object = form.save()
-        self._set_mfilter(self.object.id)
+        self._set_query(self.object.id)
         tree = TreeGenerater()
         error = tree.execute_filter(self.object.code, self.object.db.id, str(self.object))
         self._context['filter_form_error'] = error
@@ -116,7 +138,7 @@ class Main(ViewBase, generic_editor.TemplateResponseMixin, generic_editor.ModelF
 
     def form_invalid(self, form):
         if len(form.errors) > 0:
-            self._context['filter_form_error'] = 'Database and code are both required'
+            self._context['filter_form_error'] = 'All fields required'
         return self.render_to_response(self.get_context_data(form=form))
     
 def clear_cache(request):
@@ -130,30 +152,27 @@ def tree_json(request):
         json = tree.get_values(request.GET['node'])
     return HttpResponse(json, content_type="application/json")
 
-class ContactForm(forms.Form):
-    subject = forms.CharField(max_length=100)
-    message = forms.CharField()
-    sender = forms.EmailField()
-    cc_myself = forms.BooleanField(required=False)
-
 class TreeGenerater:
     _id = 0
-    comms = None
+    comms = {}
     
     def __init__(self):
         if cache.has_key(TREE_CACHE_KEY):
             self.json_data = cache.get(TREE_CACHE_KEY)
             self._data = json.loads(self.json_data)
-            self._id = self._get_max_id(self._data[-1])
+            self._id = self._get_max_id()
         else:
-            self._data = []
+            self._data = {'DATA': []}
             for db in m.Database.objects.filter(live=True):
-                self._data.append(self._get_db(db))
+                self._get_dbs(db)
             self._generate_json()
             
     def _generate_json(self):
-        self.json_data = json.dumps(self._data)
-        cache.set(TREE_CACHE_KEY, self.json_data, CACHE_KEEP_TIME)
+        self.json_data = json.dumps(self._data, indent=2)
+        try:
+            cache.set(TREE_CACHE_KEY, self.json_data, CACHE_KEEP_TIME)
+        except Exception, e:
+            print e
     
     def get_values(self, node_id):
         node_id = int(node_id)
@@ -177,7 +196,7 @@ class TreeGenerater:
             d['info'] = [('Filter Properties', [])]
             d['info'][0][1].append(('Results', len(rows)))
             d['info'][0][1].append(('SQL', sql))
-            self._data.append(d)
+            self._data['DATA'].append(d)
             self._generate_json()
             return None
         else:
@@ -193,27 +212,37 @@ class TreeGenerater:
         return rows
     
     def _find_table(self, node_id):
-        for db_info in self._data:
+        for db_info in self._data['DATA']:
             db_id = db_info['db_id']
             for table in db_info['children']:
                 if table['id'] == node_id:
                     return db_id, table
     
-    def _get_db(self, db):
-        comms = self._get_comms(db)
-        d = {'id': self._get_id(), 'label': 'DATABASE: %s' % db.name, 'db_id': db.id}
-        d['info'] = [('Database Properties', [])]
-        for name, value in db.conn_values():
-            d['info'][0][1].append((name, value))
-        d['info'][0][1].append(('Database Version', comms.get_version()))
-        d['children'] = self._get_tables(comms, db)
-        return d
+    def _get_dbs(self, db):
+        try:
+            comms = self._get_comms(db)
+            d = {'id': self._get_id(), 'label': 'DATABASE: %s' % db.name, 'db_id': db.id}
+            d['info'] = [('Database Properties', [])]
+            for name, value in db.conn_values():
+                d['info'][0][1].append((name, value))
+            d['info'][0][1].append(('DB Version', comms.get_version()))
+            dbs = []
+            for name in comms.get_databases():
+                dbs.append(('', name))
+            if len(dbs) > 0:
+                d['info'].append(('Tables', dbs))
+            d['children'] = self._get_tables(comms, db)
+        except Exception, e:
+            traceback.print_exc()
+            self._data['ERROR'] = str(e)
+        else:
+            self._data['DATA'].append(d)
     
     def _get_comms(self, db):
-        if not self.comms:
+        if db.id not in self.comms:
             Comms = getattr(DbInspect, db.db_type.class_name)
-            self.comms = Comms(dict(db.conn_values()))
-        return self.comms
+            self.comms[db.id] = Comms(dict(db.conn_values()))
+        return self.comms[db.id]
         
     def _get_tables(self, comms, db):
         t_data = []
@@ -229,7 +258,7 @@ class TreeGenerater:
             table['info'][0][1].append(('Field Count', len(fields)))
             table['fields'] = fields
             for field in fields:
-                table['info'][1][1].append((field[0], '[%s]' % str(field[1])))
+                table['info'][1][1].append((field[0], str(field[1])))
             t_data.append(table)
         return t_data
             
@@ -237,14 +266,17 @@ class TreeGenerater:
         self._id += 1
         return self._id
     
-    def _get_max_id(self, ob):
-        if self._id != 0 or len(self._data) == 0:
-            return 0
-        if 'children' in ob:
-            return self._get_max_id(ob['children'][-1])
+    def _get_max_id(self):
+        if self._id != 0 or len(self._data['DATA']) == 0:
+            return self._id
+        return self._get_max_id_rec(self._data['DATA'][-1])
+    
+    def _get_max_id_rec(self, ob):
+        if 'children' in ob and len(ob['children']) > 0:
+            return self._get_max_id_rec(ob['children'][-1])
         elif 'id' in ob:
             return ob['id']
-        return 0
+        return self._id
 
 
 

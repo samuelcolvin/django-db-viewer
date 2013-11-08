@@ -16,18 +16,13 @@
       </ul>
     </div><!--/.navbar-collapse -->
 </div>
-<div class="main-container">
-	
-	{% if page_menu %}
-	<div id="page-menu" class="hidden-print">
-		{% for item in page_menu %}
-			{% if item.url %}
-				<a href="{{item.url}}" class="btn btn-default {{item.classes}}" msg="{{ item.msg }}">{{item.name}}</a>
-			{% elif item.onclick %}
-				<button type="button" class="btn btn-default" onclick="{{item.onclick}}">{{item.name}}</button>
-			{% endif %}
-		{% endfor %}
+<div class="main-container">	
+	{% if errors %}
+	<div id="error" class="alert alert-danger">
+		{% for error in errors %} <p> {{error}} </p> {% endfor %}
 	</div>
+	{% else %}
+	<div id="error" class="alert alert-danger" style="display:none"></div>
 	{% endif %}
 	
 	{% block content %}{% endblock %}

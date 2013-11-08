@@ -23,7 +23,7 @@
 }
 
 #editor{
-	height: 600px;
+	height: 400px;
 	margin-top: 15px;
 }
 
@@ -42,7 +42,6 @@ ul.jqtree-tree .jqtree-title {
 ul.jqtree-tree .jqtree-toggler {
 	color: white !important;
 }
-	
 
 .dl-horizontal dt {
 	width: 90px;
@@ -57,19 +56,6 @@ ul.jqtree-tree .jqtree-toggler {
 	min-height: 34px;
 }
 
-.filter-form {
-	margin: 10px 0px;
-}
-
-.filter-form select {
-	width: 200px;
-	margin: 0px 20px;
-}
-
-.filter-form label {
-	display: none;
-}
-
 .span-label {
 	font-weight: 900;
 	width: 120px;
@@ -81,6 +67,6 @@ ul.jqtree-tree .jqtree-toggler {
 	display: none;
 }
 
-#id_filters {
-	width: 300px;
+.existing-queries .form-group{
+	margin-bottom: 0px;
 }
