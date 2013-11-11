@@ -1,96 +1,11 @@
-import MySQLdb as mdb
-from DbInspect import _sql
-import sqlite3
-import pymongo
-from bson.code import Code
-from DbInspect._settings import *
+import pymongo, re
+from DbInspect._utils import *
+from bson.code import Code as BsonCode
+import json
+import collections
+import traceback
 
-class MySql(_sql.SqlBase):
-    _tables = None
-    
-    def __init__(self, dbsets):
-        self.con=None
-        self._setup_types()
-        try:
-            self.con = mdb.connect(dbsets['host'], dbsets['username'], 
-                                   dbsets['password'], dbsets['db_name'], port=dbsets['port'])
-            self._cur = self.con.cursor()
-        except mdb.Error, e:
-            print "Error %d: %s" % (e.args[0],e.args[1])
-            self._close()
-        
-    def get_version(self):
-        cur = self._execute('SELECT VERSION()')
-        return cur.fetchone()
-    
-    def get_databases(self):
-        cur = self._execute('SHOW DATABASES')
-        dbs = []
-        for d_info in cur.fetchall():
-            dbs.append(d_info[0])
-        self._close()
-        return dbs
-    
-    def _get_tables(self):
-        self._tables = []
-        cur, fields = self._execute_get_descrition('SHOW TABLE STATUS')
-        field_names = [i[0] for i in fields]
-        for t_info in cur.fetchall():
-            self._tables.append((t_info[0], t_info))
-        self._close()
-        return self._tables, field_names
-    
-    def _process_column(self, col, fields):
-        fields.append([col[0], self._types[col[1]]])
-                
-    def _execute(self, command):
-        try:
-            self._cur.execute(command)
-            return self._cur
-        except Exception, e:
-            print "Error: %s" % str(e)
-            print 'SQL: %s' % command
-#             self.close()
-            raise(e)
-
-class SqlLite(_sql.SqlBase):
-    _tables = None
-    
-    def __init__(self, dbsets):
-        self._setup_types()
-        self._dbsets = dbsets
-    
-    def get_version(self):
-        return sqlite3.sqlite_version
-    
-    def get_databases(self):
-        return []
-    
-    def _get_tables(self):
-        self._tables = []
-        cur, fields = self._execute_get_descrition("SELECT * FROM sqlite_master WHERE type='table';")
-        field_names = [i[0] for i in fields]
-        for t_info in cur.fetchall():
-            self._tables.append((t_info[1], t_info))
-        self._close()
-        return self._tables, field_names
-    
-    def _process_column(self, col, fields):
-        fields.append([col[0], None])
-                
-    def _execute(self, command):
-        try:
-            self._con = sqlite3.connect(self._dbsets['path'])
-            self._cur = self._con.cursor()
-            self._cur.execute(command)
-            return self._cur
-        except Exception, e:
-            print "Error: %s" % str(e)
-            print 'SQL: %s' % command
-            self._close()
-            raise(e)
-
-class MongoDb(_sql.db_comm):
+class MongoDb(db_comm):
     _tables = None
     
     def __init__(self, dbsets):
@@ -126,17 +41,48 @@ class MongoDb(_sql.db_comm):
         c = self._db[t_name].find(limit=limit)
         return self._process_data(c)[0]
     
-    def execute(self, sql):
+    def execute(self, code, ex_type = None):
         try:
-            raise Exception('not implemented')
-            data = None
+            self._code_lines = code.split('\n')
+            self._get_other_vars()
+            if self._source_col is None:
+                raise Exception('The souce collection must be defined in the top level of the code'+
+                                ' as "source = <collection_name>')
+            collection = self._db[self._source_col]
+            if ex_type == 'map_reduce':
+                if self._dest_col is None:
+                    raise Exception('The destination collection must be defined in the top level of the code'+
+                                ' as "dest = <collection_name>')
+                functions = self._split_functions()
+                if 'map' not in functions.keys() or 'reduce' not in functions.keys():
+                    raise Exception('Both "map" and "reduce" functions must be defined')
+                data = collection.map_reduce(functions['map'], functions['reduce'], self._dest_col)
+                data = data.find()
+            else:
+                json_text = '\n'.join(self._code_lines)
+                q_object = self._ordered_json(json_text)
+                if ex_type == 'aggregate':
+                    data = collection.aggregate(q_object)
+                else:
+                    data = collection.find(q_object)
+            if self._sort:
+                sort = self._ordered_json(self._sort)
+                data = data.sort(sort.items())
+            result, fields = self._process_data(data)
         except Exception, e:
+            traceback.print_exc()
             error = 'ERROR %s: %s' % (type(e).__name__, str(e))
             return False, error, None
         else:
-            result, fields = self._process_data(data)
             print 'success %d results' % len(result)
             return True, result, fields
+    
+    def _ordered_json(self, text):
+        text = text.strip(' \t')
+        print [text]
+        if text == '':
+            return None
+        return json.JSONDecoder(object_pairs_hook=collections.OrderedDict).decode(text)
         
     def close(self):
         pass
@@ -146,12 +92,14 @@ class MongoDb(_sql.db_comm):
         i = 0
         fields = []
         for row in data:
-            print row
+#             print row
             if i == 0:
                 fields = row.keys()
                 i1 = fields[0]
                 if '_id' in fields: i1 = '_id'
                 i2 = fields[1]
+                if i1 == i2:
+                    i2 = fields[0]
                 for k in fields:
                     if 'name' in k:
                         i2 = k
@@ -163,6 +111,59 @@ class MongoDb(_sql.db_comm):
             if i > MAX_ROWS:
                 break
         return data2, fields
+    
+    def _get_other_vars(self):
+        to_find = {'source': None, 'dest': None, 'sort': None}
+        lines = self._code_lines[:]
+        for line in lines:
+            for k, v in to_find.items():
+                if re.search(k + ' *=', line)  and not v and not 'function' in line:
+                    if k == 'sort':
+                        to_find[k] = line[line.index('=') + 1:].replace(';', '')
+                        self._code_lines.remove(line)
+                    else:
+                        to_find[k] = self._get_value_remove(line)
+                    break
+            if None not in to_find.values():
+                break
+        self._source_col = to_find['source']
+        self._dest_col = to_find['dest']
+        self._sort = to_find['sort']
+    
+    def _get_value_remove(self, line): 
+        v = re.findall('\w+', line[line.index('='):])[0]
+        self._code_lines.remove(line)
+        return v
+    
+    def _split_functions(self):
+        i = 0
+        functions = {}
+        while True:
+            if i >= len(self._code_lines):
+                break
+            line = self._code_lines[i]
+            if 'function' in line:
+                endi, name, code = self._process_func(self._code_lines[i:])
+                functions[name] = code
+                i += endi
+            i += 1
+        return functions
+    
+    def _process_func(self, lines):
+        name = re.findall('\w+', lines[0].replace('function', ''))[0]
+        brackets = 0
+        started = False
+        for ii, line in enumerate(lines):
+            for c in line:
+                if c == '{':
+                    brackets +=1
+                    started = True
+                if c == '}':
+                    brackets -=1
+            if brackets == 0 and started:
+                code = '\n'.join(lines[:ii + 1])
+                return ii, name, code
+
 
 
 

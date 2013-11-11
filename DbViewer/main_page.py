@@ -132,7 +132,7 @@ class Main(ViewBase, generic_editor.TemplateResponseMixin, generic_editor.ModelF
         self.object = form.save()
         self._set_query(self.object.id)
         tree = TreeGenerater()
-        error = tree.execute_filter(self.object.code, self.object.db.id, str(self.object))
+        error = tree.execute_query(self.object)
         self._context['filter_form_error'] = error
         return self.render_to_response(self.get_context_data(form=form))
 
@@ -187,15 +187,15 @@ class TreeGenerater:
         self._generate_json()
         return json.dumps(rows)
     
-    def execute_filter(self, sql, db_id, filter_name):
-        comms = self._get_comms(m.Database.objects.get(id=db_id))
-        success, result, fields = comms.execute(sql)
+    def execute_query(self, query):
+        comms = self._get_comms(m.Database.objects.get(id=query.db.id))
+        success, result, fields = comms.execute(query.code, query.function)
         if success:
             rows = self._get_rows(result, fields)
-            d = {'id': self._get_id(), 'label': 'FILTER: %s' % filter_name, 'children': rows}
-            d['info'] = [('Filter Properties', [])]
+            d = {'id': self._get_id(), 'label': 'QUERY: %s' % str(query), 'children': rows}
+            d['info'] = [('Query Properties', [])]
             d['info'][0][1].append(('Results', len(rows)))
-            d['info'][0][1].append(('SQL', sql))
+            d['info'][0][1].append(('Code', query.code))
             self._data['DATA'].append(d)
             self._generate_json()
             return None
@@ -230,7 +230,7 @@ class TreeGenerater:
             for name in comms.get_databases():
                 dbs.append(('', name))
             if len(dbs) > 0:
-                d['info'].append(('Tables', dbs))
+                d['info'].append(('Databases', dbs))
             d['children'] = self._get_tables(comms, db)
         except Exception, e:
             traceback.print_exc()

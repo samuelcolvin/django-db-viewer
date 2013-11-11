@@ -60,8 +60,7 @@ class Query(BasicModel):
                            verbose_name = 'Database')
     code = models.TextField()
     function = models.CharField(max_length=50, default='dft', choices = (
-        ('dft', 'Default'), 
-        ('find', 'Find (MongoDB Only)'),
+        ('dft', 'Default'),
         ('aggregate', 'Aggregate (MongoDB Only)'),
         ('map_reduce', 'Map/Reduce (MongoDB Only)'),))
     
