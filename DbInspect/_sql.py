@@ -2,16 +2,16 @@ import MySQLdb as mdb
 import sqlite3
 from DbInspect._utils import *
 import pandas.io.sql as psql
+import StringIO
 
 class _SqlBase(db_comm):
-    _tables = None
-    _field_names = None
     _con=None
     
     def __init__(self, dbsets):
         self._dbsets = dbsets
         self._setup_types()
         self._con_cur()
+        self.db_name = dbsets['db_name']
     
     def _con_cur(self):
         if not self._con:
@@ -19,9 +19,8 @@ class _SqlBase(db_comm):
             self._cur = self._con.cursor()
     
     def get_tables(self):
-        if self._tables is None:
-            self._tables, self._field_names = self._get_tables()
-        return self._tables, self._field_names
+        tables, field_names = self._get_tables()
+        return tables, field_names
         
     def get_fields(self, t_name):
         cur, fields = self._execute_get_descrition('SELECT * FROM %s LIMIT 1' % t_name)
@@ -58,7 +57,10 @@ class _SqlBase(db_comm):
         try:
             self._con_cur()
             dbase = psql.frame_query(sql, con=self._con)
-            dbase.to_csv('results.csv')
+            file_stream = StringIO.StringIO()
+            dbase.to_csv(file_stream)
+            file_stream.seek(0)
+            return file_stream
         except Exception, e:
             print "Error: %s" % str(e)
             self._close()
@@ -134,13 +136,13 @@ class MySql(_SqlBase):
         return dbs
     
     def _get_tables(self):
-        self._tables = []
+        tables = []
         cur, fields = self._execute_get_descrition('SHOW TABLE STATUS')
         field_names = [i[0] for i in fields]
         for t_info in cur.fetchall():
-            self._tables.append((t_info[0], t_info))
+            tables.append((t_info[0], t_info))
         self._close()
-        return self._tables, field_names
+        return tables, field_names
     
     def _process_column(self, col, fields):
         fields.append([col[0], self._types[col[1]]])
@@ -157,13 +159,13 @@ class SqlLite(_SqlBase):
         return []
     
     def _get_tables(self):
-        self._tables = []
+        tables = []
         cur, fields = self._execute_get_descrition("SELECT * FROM sqlite_master WHERE type='table';")
         field_names = [i[0] for i in fields]
         for t_info in cur.fetchall():
-            self._tables.append((t_info[1], t_info))
+            tables.append((t_info[1], t_info))
         self._close()
-        return self._tables, field_names
+        return tables, field_names
     
     def _process_column(self, col, fields):
         fields.append([col[0], None])

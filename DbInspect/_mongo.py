@@ -4,14 +4,16 @@ from bson.code import Code as BsonCode
 import json
 import collections
 import traceback
+import StringIO
+import pandas as pd
 
 class MongoDb(db_comm):
-    _tables = None
     
     def __init__(self, dbsets):
         try:
             self._client = pymongo.MongoClient(dbsets['host'], dbsets['port'])
-            self._db = self._client[dbsets['db_name']]
+            self.db = self._client[dbsets['db_name']]
+            self.dbsets = dbsets
         except Exception, e:
             msg = 'CONNECTION ERROR %s: %s' % (type(e).__name__, str(e))
             print msg
@@ -24,58 +26,73 @@ class MongoDb(db_comm):
         return self._client.database_names()
     
     def get_tables(self):
-        if self._tables is None:
-            self._tables = []
-            for name in self._db.collection_names():
-                self._tables.append((name, (name, self._db[name].count())))
-            self._field_names = ('name', 'count')
-        return self._tables, self._field_names
+        tables = []
+        for name in self.db.collection_names():
+            tables.append((name, (name, self.db[name].count())))
+        field_names = ('name', 'count')
+        return tables, field_names
         
     def get_fields(self, t_name):
-        f = self._db[t_name].find_one()
+        f = self.db[t_name].find_one()
         if f:
             return [(k, type(v).__name__) for k, v in f.items()]
         return []
     
     def get_values(self, t_name, limit = SIMPLE_LIMIT):
-        c = self._db[t_name].find(limit=limit)
+        c = self.db[t_name].find(limit=limit)
         return self._process_data(c)[0]
     
     def execute(self, code, ex_type = None):
         try:
-            self._code_lines = code.split('\n')
-            self._get_other_vars()
-            if self._source_col is None:
-                raise Exception('The souce collection must be defined in the top level of the code'+
-                                ' as "source = <collection_name>')
-            collection = self._db[self._source_col]
-            if ex_type == 'map_reduce':
-                if self._dest_col is None:
-                    raise Exception('The destination collection must be defined in the top level of the code'+
-                                ' as "dest = <collection_name>')
-                functions = self._split_functions()
-                if 'map' not in functions.keys() or 'reduce' not in functions.keys():
-                    raise Exception('Both "map" and "reduce" functions must be defined')
-                data = collection.map_reduce(functions['map'], functions['reduce'], self._dest_col)
-                data = data.find()
-            else:
-                json_text = '\n'.join(self._code_lines)
-                q_object = self._ordered_json(json_text)
-                if ex_type == 'aggregate':
-                    data = collection.aggregate(q_object)
-                else:
-                    data = collection.find(q_object)
-            if self._sort:
-                sort = self._ordered_json(self._sort)
-                data = data.sort(sort.items())
-            result, fields = self._process_data(data)
+            cursor = self._execute(code, ex_type)
+            result, fields = self._process_data(cursor)
         except Exception, e:
             traceback.print_exc()
             error = 'ERROR %s: %s' % (type(e).__name__, str(e))
             return False, error, None
         else:
-            print 'success %d results' % len(result)
             return True, result, fields
+            
+    def generate_csv(self, code, ex_type = None):
+        try:
+            cursor = self._execute(code, ex_type)
+            df =  pd.DataFrame(list(cursor))
+            file_stream = StringIO.StringIO()
+            df.to_csv(file_stream)
+            file_stream.seek(0)
+            return file_stream
+        except Exception, e:
+            print "Error: %s" % str(e)
+            self._close()
+            raise(e)
+        
+    def _execute(self, code, ex_type = None):
+        self._code_lines = code.split('\n')
+        self._get_other_vars()
+        if self._source_col is None:
+            raise Exception('The souce collection must be defined in the top level of the code'+
+                            ' as "source = <collection_name>')
+        collection = self.db[self._source_col]
+        if ex_type == 'map_reduce':
+            if self._dest_col is None:
+                raise Exception('The destination collection must be defined in the top level of the code'+
+                            ' as "dest = <collection_name>')
+            functions = self._split_functions()
+            if 'map' not in functions.keys() or 'reduce' not in functions.keys():
+                raise Exception('Both "map" and "reduce" functions must be defined')
+            cursor = collection.map_reduce(functions['map'], functions['reduce'], self._dest_col)
+            cursor = cursor.find()
+        else:
+            json_text = '\n'.join(self._code_lines)
+            q_object = self._ordered_json(json_text)
+            if ex_type == 'aggregate':
+                cursor = collection.aggregate(q_object)
+            else:
+                cursor = collection.find(q_object)
+        if self._sort:
+            sort = self._ordered_json(self._sort)
+            cursor = cursor.sort(sort.items())
+        return cursor
     
     def _ordered_json(self, text):
         text = text.strip(' \t')
@@ -87,11 +104,11 @@ class MongoDb(db_comm):
     def close(self):
         pass
         
-    def _process_data(self, data):
-        data2 = []
+    def _process_data(self, cursor):
+        data = []
         i = 0
         fields = []
-        for row in data:
+        for row in cursor:
 #             print row
             if i == 0:
                 fields = row.keys()
@@ -106,11 +123,11 @@ class MongoDb(db_comm):
                         break
             label = self._create_label(row[i1], row[i2])
             values = [self._smart_text(v) for v in row.values()]
-            data2.append((values, label))
+            data.append((values, label))
             i += 1
             if i > MAX_ROWS:
                 break
-        return data2, fields
+        return data, fields
     
     def _get_other_vars(self):
         to_find = {'source': None, 'dest': None, 'sort': None}
@@ -136,6 +153,20 @@ class MongoDb(db_comm):
         return v
     
     def _split_functions(self):
+        def process_func(lines):
+            name = re.findall('\w+', lines[0].replace('function', ''))[0]
+            brackets = 0
+            started = False
+            for ii, line in enumerate(lines):
+                for c in line:
+                    if c == '{':
+                        brackets +=1
+                        started = True
+                    if c == '}':
+                        brackets -=1
+                if brackets == 0 and started:
+                    code = '\n'.join(lines[:ii + 1])
+                    return ii, name, code
         i = 0
         functions = {}
         while True:
@@ -148,21 +179,6 @@ class MongoDb(db_comm):
                 i += endi
             i += 1
         return functions
-    
-    def _process_func(self, lines):
-        name = re.findall('\w+', lines[0].replace('function', ''))[0]
-        brackets = 0
-        started = False
-        for ii, line in enumerate(lines):
-            for c in line:
-                if c == '{':
-                    brackets +=1
-                    started = True
-                if c == '}':
-                    brackets -=1
-            if brackets == 0 and started:
-                code = '\n'.join(lines[:ii + 1])
-                return ii, name, code
 
 
 

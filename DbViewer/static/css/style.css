@@ -67,6 +67,10 @@ ul.jqtree-tree .jqtree-toggler {
 	display: none;
 }
 
+.no-label label{
+	display: none;
+} 
+
 .existing-queries .form-group{
 	margin-bottom: 0px;
 }

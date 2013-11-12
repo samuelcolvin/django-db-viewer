@@ -16,10 +16,9 @@
 						<div style="color: #b94a48; margin-bottom: 10px">{{filter_form_error}}</div>
 					{% endif %}
 
-					{% csrf_token %}
 					{{ form.non_field_errors.as_ul }}
 					
-					<div style="display:none"> <!---->
+					<div style="display:none">
 						{{ form.code }}
 					</div>
 							
