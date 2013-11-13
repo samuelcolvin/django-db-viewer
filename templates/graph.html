@@ -1,0 +1,25 @@
+{% extends base_template %}
+
+{% block content %}	
+	<div class="btn-group">
+	  <a href="{{ request.path }}"><button type="button" class="btn btn-default">Reload</button></a>
+	</div>
+	<div id="chart-area" style="width: 100%;">
+    </div>
+{% endblock %}
+
+{% block extra_css %}
+	{% load staticfiles %}
+	<link rel="stylesheet" href="{% static "css/jqtree.css" %}">
+{% endblock %}
+
+{% block extra_js %}	
+	<script src="{% static "js/lib/canvasjs.min.js" %}"></script>
+	<script src="{% static "js/plotting.js" %}"></script>
+	<script>
+		// var source_names = {{ sources | safe }};
+		// var csv_file = '{{ data_url }}';
+		// var channel_names = {{ channel_names | safe }};
+		$(document).ready(draw);
+	</script>
+{% endblock %}

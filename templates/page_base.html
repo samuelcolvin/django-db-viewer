@@ -11,7 +11,10 @@
     <div class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
         {% for item in top_menu %}
-		<li class="{{item.class}}"><a href="{{item.url}}">{{item.name}}</a></li>
+		<li class="{{item.class}}"><a href="{{item.url}}" class="{% if item.popup %}pop-main{% endif %}">{{item.name}}</a></li>
+			{% if item.popup %}
+				<li class="{{item.class}}"><a href="{{item.popup}}" class="pop-icon glyphicon glyphicon-new-window"></a></li>
+			{% endif %}
 		{% endfor %}
       </ul>
     </div><!--/.navbar-collapse -->

@@ -26,6 +26,7 @@ class ViewBase(object): #generic.TemplateView
         top_active = None
         if self.top_active is not None:
             self.request.session['top_active'] = self.top_active
+            top_active = self.top_active
         elif 'top_active' in self.request.session:
             top_active = self.request.session['top_active']
         if 'message' in self.request.session:
@@ -47,6 +48,8 @@ class ViewBase(object): #generic.TemplateView
             except NoReverseMatch:
                 print 'No Reverse Match for "%s"' % item['url']
             else:
+                if 'popup' in item:
+                    menu_item['popup'] = reverse(item['popup'])
                 if item['url'] == top_active:
                     menu_item['class'] = 'active'
                 top_menu.append(menu_item)

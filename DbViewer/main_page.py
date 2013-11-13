@@ -29,6 +29,7 @@ class Main(views_base.ViewBase, generic_editor.TemplateResponseMixin, generic_ed
     template_name = 'main_display.html'
     form_class = QueryForm
     sub_type = None
+    top_active = 'other'
         
     def post(self, request, *args, **kw):
         self.setup_context(**kw)

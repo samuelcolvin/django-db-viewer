@@ -14,7 +14,7 @@ def generate_csv(request):
     Comms = getattr(DbInspect, query.db.db_type.class_name)
     comms = Comms(dict(query.db.conn_values()))
     stream = comms.generate_csv(query.code)
-    zip_mem = StringIO.StringIO()  
+    zip_mem = StringIO.StringIO()
     zipf = zipfile.ZipFile(zip_mem, 'a', zipfile.ZIP_DEFLATED)
     file_name = 'export_%s.csv' % str(query)
     zipf.writestr(file_name, stream.getvalue())
@@ -26,11 +26,19 @@ def generate_csv(request):
 
 class Export(views_base.ViewBase, generic.TemplateView):
     template_name = 'export.html'
+    top_active = 'export'
     
     def get_context_data(self, **kw):
         self._context.update(super(Export, self).get_context_data(**kw))
         self._context['choose_query'] = views_base.FilterChoice(-1)
         return self._context
+
+class Graph(views_base.ViewBase, generic.TemplateView):
+    template_name = 'graph.html'
+    top_active = 'graph'
     
-    def _set_query(self, qid):
-        self._context['choose_query'] = views_base.FilterChoice(qid)
+    def get_context_data(self, **kw):
+        self._context.update(super(Graph, self).get_context_data(**kw))
+        if 'pop' in self.request.path:
+            self._context['base_template'] = 'pop_base.html'
+        return self._context

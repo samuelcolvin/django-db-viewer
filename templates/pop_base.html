@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="pop-container">	
+	{% if errors %}
+	<div id="error" class="alert alert-danger">
+		{% for error in errors %} <p> {{error}} </p> {% endfor %}
+	</div>
+	{% else %}
+		<div id="error" class="alert alert-danger" style="display:none"></div>
+	{% endif %}
+	
+	{% block content %}{% endblock %}
+</div>
+{% endblock body %}

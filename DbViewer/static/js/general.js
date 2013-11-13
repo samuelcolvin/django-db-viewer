@@ -12,3 +12,8 @@ $('#id_filter').change(
     function(){
          $('.filter-form').submit();
 });
+
+$('.pop-icon').click(function(e){
+	window.open($(this).attr('href'),'name','height=600,width=800');
+	return false;
+});

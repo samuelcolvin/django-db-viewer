@@ -10,6 +10,8 @@ urlpatterns = patterns('',
     url(r'^tree.json$', DbViewer.views.tree_json, name='tree_json'),
     url(r'^export$', DbViewer.views.Export.as_view(), name='export'),
     url(r'^generate_csv$', DbViewer.views.generate_csv, name='generate_csv'),
+    url(r'^graph$', DbViewer.views.Graph.as_view(), name='graph'),
+    url(r'^graphpop$', DbViewer.views.Graph.as_view(), name='graphpop'),
 
     url(r'^admin/doc/', include('django.contrib.admindocs.urls')),
     url(r'^admin/', include(admin.site.urls)),

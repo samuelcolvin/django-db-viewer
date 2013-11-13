@@ -1,7 +1,11 @@
 .main-container{
-	padding-bottom: 100px;
 	margin: 0px;
 	padding: 60px 20px 0px;
+}
+
+.pop-container{
+	margin: 0px;
+	padding: 20px 20px 0px;
 }
 
 .centered{
@@ -74,3 +78,18 @@ ul.jqtree-tree .jqtree-toggler {
 .existing-queries .form-group{
 	margin-bottom: 0px;
 }
+
+.pop-main{
+	padding-right: 0px !important;
+}
+
+.pop-icon{
+	padding-left: 5px !important;
+	padding-right: 30px !important;
+}
+
+.pop-icon:hover{
+	color: orange !important;
+}
+
+
