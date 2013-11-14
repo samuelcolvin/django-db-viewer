@@ -10,7 +10,7 @@ cmongo = Extension('cmongo',
                     sources = ['cmongo.c'],
                     extra_compile_args=['--std=c99'])
 
-setup (name = 'MongoC',
+setup (name = 'cmongo',
        version = VERSION,
        description = 'performs mongodb queries in c and returns csv results',
        author = 'Samuel Colvin',

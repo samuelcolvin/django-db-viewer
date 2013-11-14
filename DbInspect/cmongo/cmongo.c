@@ -1,15 +1,22 @@
-#if 1
-#include <Python.h>
+#define PYTHON 1
+#if PYTHON
+	#include <Python.h>
 #endif
 #include "mongo.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#define BLOCK 200000//0000
-#define CALL_TYPE "DIRECT"
-
 typedef int (*debug_func)(const char *, ...);
+
+#define DEBUG 1
+#if DEBUG
+	debug_func debug = printf;
+#else
+	#define debug(...)
+#endif
+
+#define BLOCK 200000//0000
 
 struct BigStr {
 	size_t buffer_size;
@@ -19,40 +26,45 @@ struct BigStr {
 };
 
 int mon_connect(mongo *conn, const char * host, const int port);
-char* all_query(const char* host, const int port, char* collection);
-char* filter_query(const char* host, const int port, char* collection,
+char* all_query(const char* host, const int port, const char* collection);
+char* filter_query(const char* host, const int port, const char* collection,
 		bson* query);
 void str_headings(const char *data, struct BigStr *bs);
 void str_row(const char *data, struct BigStr *bs);
 void debug_head(const char* str);
 void adjust_size(struct BigStr *bs);
 
-#ifdef PY_MAJOR_VERSION
-#define CALL_TYPE "PYTHON"
 
-debug_func debug = printf;
-//static PyMethodDef CMongoMethods[] = {
-//	{	"all_query", all_query, METH_VARARGS, "CSV of entire collection"},
-//	{	"filter_query", filter_query, METH_VARARGS, "CSV of filtered collection"},
-//	{	NULL, NULL, 0, NULL}
-//};
-//
-//PyMODINIT_FUNC
-//initcmongo(void)
-//{
-//	(void) Py_InitModule("cmongo", CMongoMethods);
-//}
 
-#else
+#if PYTHON
+static PyObject * py_all_query(PyObject *self, PyObject *args);
 
-#define CALL_TYPE "DIRECT"
-debug_func debug = printf;
+static PyMethodDef module_functions[] = {
+    { "all_query", py_all_query, METH_VARARGS, "CSV string of entire collection" },
+    {NULL, NULL, 0, NULL}
+};
 
+PyMODINIT_FUNC initcmongo(void)
+{
+    (void) Py_InitModule("cmongo", module_functions);
+}
+
+static PyObject * py_all_query(PyObject *self, PyObject *args)
+{
+    const char *host;
+    const int port;
+    const char *collection;
+
+    if (!PyArg_ParseTuple(args, "sis:all_query", &host, &port, &collection))
+        return NULL;
+    char* result = all_query(host, port, collection);
+    return Py_BuildValue("s", result);
+}
 #endif
 
 int main(void) {
-	debug("call type: %s\n", CALL_TYPE);
-	char collection[] = "markets.markets_sourceupdate";//
+	debug("Python: %d\n", PYTHON);
+	char collection[] = "markets.markets_trace";//
 	char host[] = "127.0.0.1";
 	int port = 27017;
 	bson query[1];
@@ -92,13 +104,13 @@ void debug_head(const char* str) {
 	debug("'%s'\n", substr);
 }
 
-char* all_query(const char* host, const int port, char* collection) {
+char* all_query(const char* host, const int port, const char* collection) {
 	bson *query = NULL;
 	char* result = filter_query(host, port, collection, query);
 	return result;
 }
 
-char* filter_query(const char* host, const int port, char* collection, bson* query) {
+char* filter_query(const char* host, const int port, const char* collection, bson* query) {
 	mongo conn;
 	struct BigStr bs;
 	bs.buffer_size = BLOCK;
