@@ -1,4 +1,4 @@
-#ifdef PY_MAJOR_VERSION
+#if 1
 #include <Python.h>
 #endif
 #include "mongo.h"
@@ -10,28 +10,6 @@
 #define CALL_TYPE "DIRECT"
 
 typedef int (*debug_func)(const char *, ...);
-
-#ifdef PY_MAJOR_VERSION
-#define CALL_TYPE "PYTHON"
-
-debug_func debug = DEBUG;
-static PyMethodDef CMongoMethods[] = {
-	{	"all_query", all_query, METH_VARARGS, "CSV of entire collection"},
-	{	"filter_query", filter_query, METH_VARARGS, "CSV of filtered collection"},
-	{	NULL, NULL, 0, NULL}
-};
-
-PyMODINIT_FUNC
-initcmongo(void)
-{
-	(void) Py_InitModule("cmongo", CMongoMethods);
-}
-
-#else
-
-debug_func debug = printf;
-
-#endif
 
 struct BigStr {
 	size_t buffer_size;
@@ -48,6 +26,29 @@ void str_headings(const char *data, struct BigStr *bs);
 void str_row(const char *data, struct BigStr *bs);
 void debug_head(const char* str);
 void adjust_size(struct BigStr *bs);
+
+#ifdef PY_MAJOR_VERSION
+#define CALL_TYPE "PYTHON"
+
+debug_func debug = printf;
+//static PyMethodDef CMongoMethods[] = {
+//	{	"all_query", all_query, METH_VARARGS, "CSV of entire collection"},
+//	{	"filter_query", filter_query, METH_VARARGS, "CSV of filtered collection"},
+//	{	NULL, NULL, 0, NULL}
+//};
+//
+//PyMODINIT_FUNC
+//initcmongo(void)
+//{
+//	(void) Py_InitModule("cmongo", CMongoMethods);
+//}
+
+#else
+
+#define CALL_TYPE "DIRECT"
+debug_func debug = printf;
+
+#endif
 
 int main(void) {
 	debug("call type: %s\n", CALL_TYPE);
