@@ -1,186 +1,264 @@
+#ifdef PY_MAJOR_VERSION
+#include <Python.h>
+#endif
 #include "mongo.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#define BLOCK 20000000
+#define BLOCK 200000//0000
+#define CALL_TYPE "DIRECT"
 
-struct BigStr{
-    size_t buffer_size ;
-    char *buffer ;
-    char* buffer_pntr ;
+typedef int (*debug_func)(const char *, ...);
+
+#ifdef PY_MAJOR_VERSION
+#define CALL_TYPE "PYTHON"
+
+debug_func debug = DEBUG;
+static PyMethodDef CMongoMethods[] = {
+	{	"all_query", all_query, METH_VARARGS, "CSV of entire collection"},
+	{	"filter_query", filter_query, METH_VARARGS, "CSV of filtered collection"},
+	{	NULL, NULL, 0, NULL}
 };
 
-int monary_connect(mongo *conn, char * host, int port);
-void empty_query(char * host, int port, struct BigStr *bs);
-void print(char * str);
-void print_headings(const char *data, struct BigStr *bs);
-void print_row( const char *data, struct BigStr *bs);
+PyMODINIT_FUNC
+initcmongo(void)
+{
+	(void) Py_InitModule("cmongo", CMongoMethods);
+}
+
+#else
+
+debug_func debug = printf;
+
+#endif
+
+struct BigStr {
+	size_t buffer_size;
+	char* buffer;
+	char* buftemp;
+	int curr_size;
+};
+
+int mon_connect(mongo *conn, const char * host, const int port);
+char* all_query(const char* host, const int port, char* collection);
+char* filter_query(const char* host, const int port, char* collection,
+		bson* query);
+void str_headings(const char *data, struct BigStr *bs);
+void str_row(const char *data, struct BigStr *bs);
+void debug_head(const char* str);
+void adjust_size(struct BigStr *bs);
 
 int main(void) {
-  struct BigStr bs;
-  bs.buffer_size = BLOCK;
-  bs.buffer = (char*) malloc(BLOCK);
-  bs.buffer_pntr = bs.buffer;
-  
-  char host[]="127.0.0.1";
-  empty_query(host, 27017, &bs);
-  
-  bs.buffer = realloc(bs.buffer, strlen(bs.buffer+1));
-  char substr[5000];
-  memcpy(substr, bs.buffer, 5000);
-  printf("%s", substr);
-}
-
-int monary_connect(mongo *conn, char * host, int port)
-{
-  char s[200];
-  if( mongo_client( conn, host, port ) != MONGO_OK ) {
-    switch( (*conn).err ) {
-      case MONGO_CONN_SUCCESS:
+	debug("call type: %s\n", CALL_TYPE);
+	char collection[] = "markets.markets_sourceupdate";//
+	char host[] = "127.0.0.1";
+	int port = 27017;
+	bson query[1];
+	bson_init(query);
+	bson_append_int(query, "currency_id", 3);
+	bson_finish(query);
+	char* result1 = filter_query(host, port, collection, query);
+	debug("Filtered Results:\n");
+	debug_head(result1);
+	if (result1 == '\0') {
+		free(result1);
+	}
+	char* result2 = all_query(host, port, collection);
+	debug("All Results:\n");
+	debug_head(result2);
+	if (result2 == '\0') {
+		free(result2);
+	}
 	return 1;
-	break;
-      case MONGO_CONN_NO_SOCKET:
-	sprintf(s,"FAIL: Could not create a socket!");
-	break;
-      case MONGO_CONN_FAIL:
-	sprintf(s,"FAIL: Could not connect to mongod. Make sure it's listening to the correct port.");
-	break;
-      default:
-	sprintf(s, "MongoDB connection error number %d.", (*conn).err);
-    }
-    print(s);
-    return 0;
-  }
-  print("Connected.\n");
-  return 1;
 }
 
-void empty_query(char * host, int port, struct BigStr *bs) {
-  mongo conn;
-  int e = monary_connect(&conn, host, port);
-  if( e != 1 ) {
-    return;
-  }
-  mongo_cursor cursor[1];
-  mongo_cursor_init( cursor, &conn, "markets.markets_article" );
-  int i = 0;
-  while( mongo_cursor_next( cursor ) == MONGO_OK ){
-    const bson *b = &cursor->current;
-    if (i == 0){
-      print_headings( b->data, bs);
-      bs->buffer_pntr += sprintf(bs->buffer_pntr, "\n" );
-    }
-    print_row( b->data, bs);
-    bs->buffer_pntr += sprintf(bs->buffer_pntr, "\n" );
-    if ((bs->buffer + bs->buffer_size - bs->buffer_pntr) < BLOCK) {
-      bs->buffer_size += BLOCK;
-      bs->buffer = realloc(bs->buffer, bs->buffer_size);
-    }
-    i++;
-  }
-  
-  mongo_cursor_destroy( cursor );
-  mongo_destroy( &conn );
+void debug_head(const char* str) {
+	if (str == NULL) {
+		debug("HEAD DEBUG: string null\n");
+		return;
+	}
+	if (str[0] == '\0') {
+		debug("HEAD DEBUG: blank string\n");
+		return;
+	}
+	int l = 10000;
+	if (l > strlen(str))
+		l = strlen(str) + 1;
+	char substr[l];
+	memcpy(substr, str, l);
+	debug("HEAD DEBUG: (total length: %d)\n", (int) strlen(str));
+	debug("'%s'\n", substr);
 }
 
-void print(char s[])
-{
-  printf("%s\n",s);
-  return;
+char* all_query(const char* host, const int port, char* collection) {
+	bson *query = NULL;
+	char* result = filter_query(host, port, collection, query);
+	return result;
 }
 
-void print_headings(const char *data, struct BigStr *bs) {
-    const char *key;
-    bson_iterator i;
-    bson_iterator_from_buffer( &i, data);
-
-    while ( bson_iterator_next( &i ) ) {
-        bson_type t = bson_iterator_type( &i );
-        if ( t == 0 )
-            break;
-        key = bson_iterator_key( &i );
-	if (key[0] == '\0')
-	  continue;
-        bs->buffer_pntr += sprintf(bs->buffer_pntr, "%s, ", key);
-    }
+char* filter_query(const char* host, const int port, char* collection, bson* query) {
+	mongo conn;
+	struct BigStr bs;
+	bs.buffer_size = BLOCK;
+	bs.buffer = (char*) malloc(bs.buffer_size);
+	bs.buftemp = bs.buffer;
+	bs.curr_size = 0;
+	int e = mon_connect(&conn, host, port);
+	if (e != 1) {
+		return "ERROR";
+	}
+	mongo_cursor cursor[1];
+	mongo_cursor_init(cursor, &conn, collection);
+	if (query != NULL) {
+		debug("query not null\n");
+		mongo_cursor_set_query(cursor, query);
+	}
+	int i = 0;
+	while (mongo_cursor_next(cursor) == MONGO_OK) {
+		const bson *b = &cursor->current;
+		if (i == 0) {
+			str_headings(b->data, &bs);
+			bs.buftemp = bs.buffer + bs.curr_size;
+			bs.curr_size += sprintf(bs.buftemp, "\n");
+		}
+		str_row(b->data, &bs);
+		bs.buftemp = bs.buffer + bs.curr_size;
+		bs.curr_size += sprintf(bs.buftemp, "\n");
+		adjust_size(&bs);
+		i++;
+	}
+	debug("buffer_size: %d\n", bs.buffer_size);
+	bs.buffer = realloc(bs.buffer, strlen(bs.buffer + 1));
+	mongo_cursor_destroy(cursor);
+	mongo_destroy(&conn);
+	return bs.buffer;
 }
 
-void print_row(const char *data, struct BigStr *bs) {
-    const char *key;
-    bson_timestamp_t ts;
-    char oidhex[25];
-//     bson scope;
-    bson_iterator i;
-    bson_iterator_from_buffer( &i, data );
+void adjust_size(struct BigStr *bs) {
+	if ((bs->buffer_size - bs->curr_size) < BLOCK) {
+		bs->buffer_size += BLOCK;
+		bs->buffer = realloc(bs->buffer, bs->buffer_size);
+	}
+}
 
-    while ( bson_iterator_next( &i ) ) {
-        bson_type t = bson_iterator_type( &i );
-        if ( t == 0 )
-            break;
-        key = bson_iterator_key( &i );
-	if (key[0] == '\0')
-	  continue;
-        switch ( t ) {
-        case BSON_DOUBLE:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "%f" , bson_iterator_double( &i ) );
-            break;
-        case BSON_STRING:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "%s" , bson_iterator_string( &i ) );
-            break;
-        case BSON_SYMBOL:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "%s" , bson_iterator_string( &i ) );
-            break;
-        case BSON_OID:
-            bson_oid_to_string( bson_iterator_oid( &i ), oidhex );
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "%s" , oidhex );
-            break;
-        case BSON_BOOL:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "%s" , bson_iterator_bool( &i ) ? "true" : "false" );
-            break;
-        case BSON_DATE:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "%ld" , ( long int )bson_iterator_date( &i ) );
-            break;
-        case BSON_REGEX:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "%s", bson_iterator_regex( &i ) );
-            break;
-        case BSON_CODE:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "%s", bson_iterator_code( &i ) );
-            break;
-        case BSON_BINDATA:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "BSON_BINDATA" );
-            break;
-        case BSON_UNDEFINED:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "BSON_UNDEFINED" );
-            break;
-        case BSON_NULL:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "BSON_NULL" );
-            break;
-        case BSON_INT:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "%d" , bson_iterator_int( &i ) );
-            break;
-        case BSON_LONG:
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "%ld" , ( long )bson_iterator_long( &i ) );
-            break;
-        case BSON_TIMESTAMP:
-            ts = bson_iterator_timestamp( &i );
-            bs->buffer_pntr += sprintf(bs->buffer_pntr, "i: %d, t: %d", ts.i, ts.t );
-            break;
+int mon_connect(mongo *conn, const char * host, const int port) {
+	if (mongo_client(conn, host, port) != MONGO_OK) {
+		switch (conn->err) {
+		case MONGO_CONN_SUCCESS:
+			break;
+		case MONGO_CONN_NO_SOCKET:
+			debug("FAIL: Could not create a socket.\n");
+			return 0;
+		case MONGO_CONN_FAIL:
+			debug("FAIL: Could not connect to mongo. Make sure mongo is listening at: '%s' port %i\n",
+					host, port);
+			return 0;
+		default:
+			debug("MongoDB connection error number %d.\n", conn->err);
+			return 0;
+		}
+	}
+	debug("CONNECTED TO %s:%d\n", host, port);
+	return 1;
+}
+
+void str_headings(const char *data, struct BigStr *bs) {
+	const char *key;
+	bson_iterator i;
+	bson_iterator_from_buffer(&i, data);
+
+	while (bson_iterator_next(&i)) {
+		bson_type t = bson_iterator_type(&i);
+		if (t == 0)
+			break;
+		key = bson_iterator_key(&i);
+		if (key[0] == '\0')
+			continue;
+		bs->buftemp = bs->buffer + bs->curr_size;
+		bs->curr_size += sprintf(bs->buftemp, "%s, ", key);
+	}
+}
+
+void str_row(const char *data, struct BigStr *bs) {
+	const char *key;
+	bson_timestamp_t ts;
+	char oidhex[25];
+	bson_iterator i;
+	bson_iterator_from_buffer(&i, data);
+	while (bson_iterator_next(&i)) {
+		bson_type t = bson_iterator_type(&i);
+		if (t == 0)
+			break;
+		key = bson_iterator_key(&i);
+		if (key[0] == '\0')
+			continue;
+		bs->buftemp = bs->buffer + bs->curr_size;
+		switch (t) {
+		case BSON_DOUBLE:
+			bs->curr_size += sprintf(bs->buftemp, "%f", bson_iterator_double(&i));
+			break;
+		case BSON_STRING:
+			bs->curr_size += sprintf(bs->buftemp, "%s", bson_iterator_string(&i));
+			break;
+		case BSON_SYMBOL:
+			bs->curr_size += sprintf(bs->buftemp, "%s", bson_iterator_string(&i));
+			break;
+		case BSON_OID:
+			bson_oid_to_string(bson_iterator_oid(&i), oidhex);
+			bs->curr_size += sprintf(bs->buftemp, "%s", oidhex);
+			break;
+		case BSON_BOOL:
+			bs->curr_size += sprintf(bs->buftemp, "%s",
+					bson_iterator_bool(&i) ? "true" : "false");
+			break;
+		case BSON_DATE:
+			bs->curr_size += sprintf(bs->buftemp, "%ld", (long int) bson_iterator_date(&i));
+			break;
+		case BSON_REGEX:
+			bs->curr_size += sprintf(bs->buftemp, "%s", bson_iterator_regex(&i));
+			break;
+		case BSON_CODE:
+			bs->curr_size += sprintf(bs->buftemp, "%s", bson_iterator_code(&i));
+			break;
+		case BSON_BINDATA:
+			bs->curr_size += sprintf(bs->buftemp, "BSON_BINDATA");
+			break;
+		case BSON_UNDEFINED:
+			bs->curr_size += sprintf(bs->buftemp, "BSON_UNDEFINED");
+			break;
+		case BSON_NULL:
+			bs->curr_size += sprintf(bs->buftemp, "BSON_NULL");
+			break;
+		case BSON_INT:
+			bs->curr_size += sprintf(bs->buftemp, "%d", bson_iterator_int(&i));
+			break;
+		case BSON_LONG:
+			bs->curr_size += sprintf(bs->buftemp, "%ld",
+					(long) bson_iterator_long(&i));
+			break;
+		case BSON_TIMESTAMP:
+			ts = bson_iterator_timestamp(&i);
+			bs->curr_size += sprintf(bs->buftemp, "i: %d, t: %d", ts.i, ts.t);
+			break;
 //         case BSON_CODEWSCOPE:
-//             bs->buffer_pntr += sprintf(bs->buffer_pntr, "BSON_CODE_W_SCOPE: %s", bson_iterator_code( &i ) );
+//             bs->curr_size += sprintf(bs->buftemp, "BSON_CODE_W_SCOPE: %s", bson_iterator_code( &i ) );
 //             bson_iterator_code_scope_init( &i, &scope, 0 );
-//             bs->buffer_pntr += sprintf(bs->buffer_pntr, "\n\t SCOPE: " );
+//             bs->curr_size += sprintf(bs->buftemp, "\n\t SCOPE: " );
 //             bson_print( &scope );
 //             bson_destroy( &scope );
 //             break;
 //         case BSON_OBJECT:
 //         case BSON_ARRAY:
-//             bs->buffer_pntr += sprintf(bs->buffer_pntr, "\n" );
+//             bs->curr_size += sprintf(bs->buftemp, "\n" );
 //             bson_print_raw( bson_iterator_value( &i ) , depth + 1 );
 //             break;
-        default:
-            bson_errprintf( "missing type: %d" , t );
-        }
-    bs->buffer_pntr += sprintf(bs->buffer_pntr, ", " );
-    }
+		default:
+			bs->curr_size += sprintf(bs->buftemp, "?");
+			debug("missing type: %d\n", t);
+		}
+		bs->buftemp = bs->buffer + bs->curr_size;
+		bs->curr_size += sprintf(bs->buftemp, ", ");
+		adjust_size(bs);
+	}
 }
