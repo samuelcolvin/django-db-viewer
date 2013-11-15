@@ -4,7 +4,7 @@ VERSION = '0.1'
 cmongo = Extension('cmongo', 
                     define_macros = [('PYTHON', '1')],
                     include_dirs = ['/usr/local/include'],
-                    libraries = ['mongoc', 'json'],
+                    libraries = ['json-c', 'mongoc'],
                     library_dirs = ['/usr/local/lib'],
                     sources = ['json2bson.c', 'cmongo.c'],
                     extra_compile_args=['--std=c99'])
@@ -14,8 +14,7 @@ setup (name = 'cmongo',
        description = 'performs mongodb queries in c and returns csv results',
        author = 'Samuel Colvin',
        author_email = 'S@muelColvin.com',
-       headers=['cmongo.h'],
        long_description = '''
-Package inspired by monary but complete rewritten.
+Package inspired by monary but completely rewritten.
 ''',
        ext_modules = [cmongo])
