@@ -87,7 +87,7 @@ int main(void) {
 	debug("JSON TEST:\n------------\n------------\n");
 	json2bson_test();
 	debug("\n------------\n------------\n");
-	char collection[] = "markets.markets_trace"; //
+	char collection[] = "markets.markets_trace";
 	debug("Testing with '%s':\n", collection);
 	char host[] = "127.0.0.1";
 	int port = 27017;
@@ -151,6 +151,8 @@ char* filter_query_json(const char* host, const int port,
 	return result;
 }
 
+char* temp_str;
+long temp_str_original;
 char* filter_query(const char* host, const int port, const char* collection,
 		bson* query) {
 	mongo conn;
@@ -169,6 +171,8 @@ char* filter_query(const char* host, const int port, const char* collection,
 		mongo_cursor_set_query(cursor, query);
 	}
 	int i = 0;
+	temp_str = (char*) malloc(BLOCK);
+	temp_str_original = (long) temp_str;
 	while (mongo_cursor_next(cursor) == MONGO_OK) {
 		const bson *b = &cursor->current;
 		if (i == 0) {
@@ -182,6 +186,7 @@ char* filter_query(const char* host, const int port, const char* collection,
 		adjust_size(&bs);
 		i++;
 	}
+	free(temp_str);
 	debug("buffer_size: %d\n", (int)bs.buffer_size);
 	bs.buffer = realloc(bs.buffer, strlen(bs.buffer + 1));
 	mongo_cursor_destroy(cursor);
@@ -235,6 +240,37 @@ void str_headings(const char *data, struct BigStr *bs) {
 	}
 }
 
+char *str_replace(const char *str, const char *old, const char *new)
+{
+	char *ret, *r;
+	const char *p, *q;
+	size_t oldlen = strlen(old);
+	size_t count, retlen, newlen = strlen(new);
+
+	if (oldlen != newlen) {
+		for (count = 0, p = str; (q = strstr(p, old)) != NULL; p = q + oldlen)
+			count++;
+		/* this is undefined if p - str > PTRDIFF_MAX */
+		retlen = p - str + strlen(p) + count * (newlen - oldlen);
+	} else
+		retlen = strlen(str);
+
+	if ((ret = malloc(retlen + 1)) == NULL)
+		return NULL;
+
+	for (r = ret, p = str; (q = strstr(p, old)) != NULL; p = q + oldlen) {
+		/* this is undefined if q - p > PTRDIFF_MAX */
+		size_t l = q - p;
+		memcpy(r, p, l);
+		r += l;
+		memcpy(r, new, newlen);
+		r += newlen;
+	}
+	strcpy(r, p);
+
+	return ret;
+}
+
 void str_row(const char *data, struct BigStr *bs) {
 	const char *key;
 	bson_timestamp_t ts;
@@ -255,8 +291,12 @@ void str_row(const char *data, struct BigStr *bs) {
 					bson_iterator_double(&i));
 			break;
 		case BSON_STRING:
-			bs->curr_size += sprintf(bs->buftemp, "%s",
-					bson_iterator_string(&i));
+			sprintf(temp_str, "%s", bson_iterator_string(&i));
+			temp_str = str_replace(temp_str, "\n", "  ");
+			temp_str = str_replace(temp_str, "\"", "'");
+			bs->curr_size += sprintf(bs->buftemp, "\"%s\"", temp_str);
+			temp_str = (char*) temp_str_original;
+//			bs->curr_size += sprintf(bs->buftemp, "\"%s\"", bson_iterator_string(&i));
 			break;
 		case BSON_SYMBOL:
 			bs->curr_size += sprintf(bs->buftemp, "%s",

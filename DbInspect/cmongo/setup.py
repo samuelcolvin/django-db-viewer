@@ -1,3 +1,8 @@
+"""
+to compile with gcc: gcc --std=c99 json2bson.c -I /usr/include/json  cmongo.c -lmongoc -ljson-c -o mong_test
+
+build, mv: rm -rf build cmongo.so; python setup.py build; cp build/lib.linux-x86_64-2.7/cmongo.so .; rm -rf build
+"""
 from distutils.core import setup, Extension
 VERSION = '0.1'
 
