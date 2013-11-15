@@ -1,23 +1,11 @@
-#define PYTHON 1
-#if PYTHON
-	#include <Python.h>
+#ifdef PYTHON
+#include <Python.h>
 #endif
-#include "mongo.h"
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <sys/types.h>
+#include "cmongo.h"
+
 typedef int (*debug_func)(const char *, ...);
 
-#define DEBUG 1
-#if DEBUG
-	debug_func debug = printf;
-#else
-	#define debug(...)
-#endif
-
-#define BLOCK 200000//0000
-
+#define BLOCK 20000000
 struct BigStr {
 	size_t buffer_size;
 	char* buffer;
@@ -29,62 +17,106 @@ int mon_connect(mongo *conn, const char * host, const int port);
 char* all_query(const char* host, const int port, const char* collection);
 char* filter_query(const char* host, const int port, const char* collection,
 		bson* query);
+char* filter_query_json(const char* host, const int port,
+		const char* collection, const char* json);
 void str_headings(const char *data, struct BigStr *bs);
 void str_row(const char *data, struct BigStr *bs);
 void debug_head(const char* str);
 void adjust_size(struct BigStr *bs);
 
-
-
-#if PYTHON
+#ifdef PYTHON
 static PyObject * py_all_query(PyObject *self, PyObject *args);
+static PyObject * py_filter_query(PyObject *self, PyObject *args);
 
 static PyMethodDef module_functions[] = {
-    { "all_query", py_all_query, METH_VARARGS, "CSV string of entire collection" },
-    {NULL, NULL, 0, NULL}
+	{	"all_query", py_all_query, METH_VARARGS, "CSV string of entire collection"},
+	{	"filter_query", py_filter_query, METH_VARARGS, "CSV string of filtered collection"},
+	{	NULL, NULL, 0, NULL}
 };
 
+static PyObject *JsonParseError;
 PyMODINIT_FUNC initcmongo(void)
 {
-    (void) Py_InitModule("cmongo", module_functions);
+    PyObject *m;
+	m = Py_InitModule("cmongo", module_functions);
+
+    if (m == NULL)
+        return;
+
+    JsonParseError = PyErr_NewException("py_filter_query.error", NULL, NULL);
+    Py_INCREF(JsonParseError);
+    PyModule_AddObject(m, "error", JsonParseError);
 }
 
 static PyObject * py_all_query(PyObject *self, PyObject *args)
 {
-    const char *host;
-    const int port;
-    const char *collection;
+	const char *host;
+	const int port;
+	const char *collection;
 
-    if (!PyArg_ParseTuple(args, "sis:all_query", &host, &port, &collection))
-        return NULL;
-    char* result = all_query(host, port, collection);
-    return Py_BuildValue("s", result);
+	if (!PyArg_ParseTuple(args, "sis:all_query", &host, &port, &collection))
+	return NULL;
+	char* result = all_query(host, port, collection);
+	return Py_BuildValue("s", result);
+}
+
+static PyObject * py_filter_query(PyObject *self, PyObject *args)
+{
+	const char *host;
+	const int port;
+	const char *collection;
+	const char *json;
+
+	if (!PyArg_ParseTuple(args, "siss:filter_query", &host, &port, &collection, &json))
+		return NULL;
+
+	bson query[1];
+	if (!json_to_bson(json, query)){
+		PyErr_SetString(JsonParseError, "Failed to Parse Json");
+		return NULL;
+	}
+
+	char* result = filter_query(host, port, collection, query);
+	bson_destroy(query);
+	return Py_BuildValue("s", result);
 }
 #endif
 
+#ifndef PYTHON
 int main(void) {
-	debug("Python: %d\n", PYTHON);
-	char collection[] = "markets.markets_trace";//
+	debug("JSON TEST:\n------------\n------------\n");
+	json2bson_test();
+	debug("\n------------\n------------\n");
+	char collection[] = "markets.markets_trace"; //
+	debug("Testing with '%s':\n", collection);
 	char host[] = "127.0.0.1";
 	int port = 27017;
-	bson query[1];
-	bson_init(query);
-	bson_append_int(query, "currency_id", 3);
-	bson_finish(query);
-	char* result1 = filter_query(host, port, collection, query);
-	debug("Filtered Results:\n");
+	debug("All Results:\n");
+	char* result1 = all_query(host, port, collection);
 	debug_head(result1);
 	if (result1 == '\0') {
 		free(result1);
 	}
-	char* result2 = all_query(host, port, collection);
-	debug("All Results:\n");
+	bson query[1];
+	bson_init(query);
+	bson_append_int(query, "exchange_id", 1);
+	bson_finish(query);
+	debug("BSON Filtered Results:\n");
+	char* result2 = filter_query(host, port, collection, query);
 	debug_head(result2);
 	if (result2 == '\0') {
 		free(result2);
 	}
+	debug("JSON Filtered Results:\n");
+	char* result3 = filter_query_json(host, port, collection,
+			"{ \"exchange_id\": 1 }");
+	debug_head(result3);
+	if (result3 == '\0') {
+		free(result3);
+	}
 	return 1;
 }
+#endif
 
 void debug_head(const char* str) {
 	if (str == NULL) {
@@ -110,7 +142,17 @@ char* all_query(const char* host, const int port, const char* collection) {
 	return result;
 }
 
-char* filter_query(const char* host, const int port, const char* collection, bson* query) {
+char* filter_query_json(const char* host, const int port,
+		const char* collection, const char* json) {
+	bson query[1];
+	json_to_bson(json, query);
+	char* result = filter_query(host, port, collection, query);
+	bson_destroy(query);
+	return result;
+}
+
+char* filter_query(const char* host, const int port, const char* collection,
+		bson* query) {
 	mongo conn;
 	struct BigStr bs;
 	bs.buffer_size = BLOCK;
@@ -124,7 +166,6 @@ char* filter_query(const char* host, const int port, const char* collection, bso
 	mongo_cursor cursor[1];
 	mongo_cursor_init(cursor, &conn, collection);
 	if (query != NULL) {
-		debug("query not null\n");
 		mongo_cursor_set_query(cursor, query);
 	}
 	int i = 0;
@@ -141,7 +182,7 @@ char* filter_query(const char* host, const int port, const char* collection, bso
 		adjust_size(&bs);
 		i++;
 	}
-	debug("buffer_size: %d\n", bs.buffer_size);
+	debug("buffer_size: %d\n", (int)bs.buffer_size);
 	bs.buffer = realloc(bs.buffer, strlen(bs.buffer + 1));
 	mongo_cursor_destroy(cursor);
 	mongo_destroy(&conn);
@@ -164,7 +205,8 @@ int mon_connect(mongo *conn, const char * host, const int port) {
 			debug("FAIL: Could not create a socket.\n");
 			return 0;
 		case MONGO_CONN_FAIL:
-			debug("FAIL: Could not connect to mongo. Make sure mongo is listening at: '%s' port %i\n",
+			debug(
+					"FAIL: Could not connect to mongo. Make sure mongo is listening at: '%s' port %i\n",
 					host, port);
 			return 0;
 		default:
@@ -209,13 +251,16 @@ void str_row(const char *data, struct BigStr *bs) {
 		bs->buftemp = bs->buffer + bs->curr_size;
 		switch (t) {
 		case BSON_DOUBLE:
-			bs->curr_size += sprintf(bs->buftemp, "%f", bson_iterator_double(&i));
+			bs->curr_size += sprintf(bs->buftemp, "%f",
+					bson_iterator_double(&i));
 			break;
 		case BSON_STRING:
-			bs->curr_size += sprintf(bs->buftemp, "%s", bson_iterator_string(&i));
+			bs->curr_size += sprintf(bs->buftemp, "%s",
+					bson_iterator_string(&i));
 			break;
 		case BSON_SYMBOL:
-			bs->curr_size += sprintf(bs->buftemp, "%s", bson_iterator_string(&i));
+			bs->curr_size += sprintf(bs->buftemp, "%s",
+					bson_iterator_string(&i));
 			break;
 		case BSON_OID:
 			bson_oid_to_string(bson_iterator_oid(&i), oidhex);
@@ -226,10 +271,12 @@ void str_row(const char *data, struct BigStr *bs) {
 					bson_iterator_bool(&i) ? "true" : "false");
 			break;
 		case BSON_DATE:
-			bs->curr_size += sprintf(bs->buftemp, "%ld", (long int) bson_iterator_date(&i));
+			bs->curr_size += sprintf(bs->buftemp, "%ld",
+					(long int) bson_iterator_date(&i));
 			break;
 		case BSON_REGEX:
-			bs->curr_size += sprintf(bs->buftemp, "%s", bson_iterator_regex(&i));
+			bs->curr_size += sprintf(bs->buftemp, "%s",
+					bson_iterator_regex(&i));
 			break;
 		case BSON_CODE:
 			bs->curr_size += sprintf(bs->buftemp, "%s", bson_iterator_code(&i));
