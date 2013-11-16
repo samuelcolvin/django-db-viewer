@@ -65,7 +65,7 @@ class Query(BasicModel):
         ('map_reduce', 'Map/Reduce (MongoDB Only)'),))
     
     def __unicode__(self):
-        return self.name
+        return '%s: %s' % (self.db.name, self.name)
     
     class Meta:
         verbose_name_plural = 'Queries'

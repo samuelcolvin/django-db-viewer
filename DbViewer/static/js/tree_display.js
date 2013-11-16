@@ -54,7 +54,7 @@ $('#tree').bind(
 	        node.info.forEach(function(info){
 	        	desc.append('<h4>' + info[0] + '</h4>');
 	        	info[1].forEach(function(prop){
-		        	desc.append('<dt>' + prop[0] + '</dt>');
+		        	desc.append('<dt title="' + prop[0] + '">' + prop[0] + '</dt>');
 		        	var value = $('<div/>').text(prop[1]).html();
 		        	desc.append('<dd><pre>' + value + '</pre></dd>');
 	        	});

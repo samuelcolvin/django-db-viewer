@@ -60,7 +60,7 @@ class _SqlBase(db_comm):
             file_stream = StringIO.StringIO()
             dbase.to_csv(file_stream)
             file_stream.seek(0)
-            return file_stream
+            return file_stream.getvalue()
         except Exception, e:
             print "Error: %s" % str(e)
             self._close()

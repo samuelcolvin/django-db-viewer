@@ -60,7 +60,7 @@ class MongoDb(db_comm):
             file_stream = StringIO.StringIO()
             df.to_csv(file_stream)
             file_stream.seek(0)
-            return file_stream
+            return file_stream.getvalue()
         except Exception, e:
             print "Error: %s" % str(e)
             self._close()
@@ -121,7 +121,16 @@ class MongoDb(db_comm):
                     if 'name' in k:
                         i2 = k
                         break
-            label = self._create_label(row[i1], row[i2])
+            try:
+                label = self._create_label(row[i1], row[i2])
+            except KeyError:
+                l1 = '*'
+                l2 = '*'
+                try: l1 = row[i1]
+                except: pass
+                try: l2 = row[i2]
+                except: pass
+                label = self._create_label(l1, l2)
             values = [self._smart_text(v) for v in row.values()]
             data.append((values, label))
             i += 1

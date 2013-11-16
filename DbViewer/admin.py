@@ -7,7 +7,7 @@ class DbType(admin.ModelAdmin):
 admin.site.register(m.DbType, DbType)
 
 class Database(admin.ModelAdmin):
-    list_display = ('id', 'name', 'db_type', 'db_name', 'host')
+    list_display = ('id', 'name', 'live', 'db_type', 'db_name', 'host')
 
 admin.site.register(m.Database, Database)
 
