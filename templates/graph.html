@@ -1,21 +1,36 @@
 {% extends base_template %}
 
 {% block content %}
-	<div class="form-group">
-	    <div class="input-group no-label">
-	      
-						<span class="input-group-addon">X</span>
-						<select id="x_select" class="form-control">
-						</select>
-	    </div><!-- /input-group -->
-	</div>	
 	{% load bootstrap %}
-	<div class="form-group">
-		<button onclick="window.location.href='{{ request.path }}'" type="button" class="btn btn-default">Reload Page</button>
+	<div style="display:none">
+  		<div class="query-blob" id="template-query">
+		    <button type="button" class="btn btn-default dropdown-toggle"></button>
+  		</div>
 	</div>
-	<div class="row">
-		{% load bootstrap %}
-		<div class="col-md-6 col-xs-12">
+	<div class="form-group">
+	    <div class="input-group">
+	      <div class="input-group-btn">
+			<!--<button onclick="window.location.href='{{ request.path }}'" type="button" class="btn btn-default full-height-btn">Reload Page</button>-->
+	        <button class="btn btn-default full-height-btn" type="button" id="add_query">Add Query</button>
+	      </div>
+	      <div class="form-control" id="query-panel">
+	      	
+	      </div>
+	    </div>
+	</div>	
+	
+	<div id="chart-area" style="width: 100%;">
+    </div>
+	
+<div class="modal fade" id="edit_model" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 class="modal-title" id="myModalLabel">Query Settings</h4>
+      </div>
+      <div class="modal-body">
+        	<input type="hidden" name="qid" value="-1">
 			<div class="existing-queries form-group">
 			    <div class="input-group no-label">
 			      {{ choose_query |bootstrap }}
@@ -24,8 +39,6 @@
 			      </span>
 			    </div><!-- /input-group -->
 			</div>
-		</div>
-		<div class="col-md-6 col-xs-12">
 			<div class="row">
 				<div class="col-sm-6 col-xs-12 form-group">
 					<div class="input-group">
@@ -42,23 +55,29 @@
 					</div>
 				</div>
 			</div>
-		</div>
-	</div>
-	<div id="chart-area" style="width: 100%;">
-    </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" data-dismiss="modal" id="delete">Delete</button>
+        <button type="button" class="btn btn-primary" data-dismiss="modal" id="save">Save changes</button>
+      </div>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+ </div>
 {% endblock %}
 
 {% block extra_css %}
 	{% load staticfiles %}
-	<link rel="stylesheet" href="{% static "css/jqtree.css" %}">
+	<link rel="stylesheet" href="{% static "css/graph.css" %}">
 {% endblock %}
 
-{% block extra_js %}	
+{% block extra_js %}
 	<script src="{% static "js/lib/canvasjs.min.js" %}"></script>
 	<script src="{% static "js/lib/csvjson.min.js" %}"></script>
 	<script>
 		var csv_url = "{% url 'generate_csv' %}";
 		var code_formats = {{ code_formats|safe }};
 	</script>
-	<script src="{% static "js/plotting.js" %}"></script>
+	<script src="{% static "js/plot.js" %}"></script>
+	<script src="{% static "js/graph.js" %}"></script>
 {% endblock %}

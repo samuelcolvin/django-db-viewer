@@ -1,0 +1,18 @@
+.full-height-btn{
+	height: 100%;
+	padding: 0px 12px;
+}
+
+.query-blob{
+	text-align: center;
+	margin: 0px 5px;
+	float: left;
+}
+
+.query-blob .btn{
+	padding: 1px 5px;
+}
+
+.modal {
+	background-color: inherit;
+}
