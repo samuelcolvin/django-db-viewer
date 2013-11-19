@@ -105,6 +105,15 @@ $('#save').click(function() {
 	draw();
 });
 
+$('#delete').click(function() {
+	var qid = parseInt($('#id_queries').val());
+	if (_.has(graphs, qid)){
+		delete graphs[qid];
+		$('#query_' + qid).remove();
+		draw();
+	}
+});
+
 function add_blog(id, name){
 	var d = $('#template-query').clone();
 	d.attr('id', 'query_' + id);
@@ -122,15 +131,8 @@ function blob_edit(){
 	$('#id_queries').attr('disabled', 'disabled');
 	$('#btn-get-data').attr('disabled', 'disabled');
 	$('#edit_model').modal('show');
-	return close_dropdown(this);
-}
-
-function blob_delete(){
-	var qid = set_live_graph(this);
-	delete graphs[qid];
-	$('#query_' + qid).remove();
-	draw();
-	return close_dropdown(this);
+	$(this).closest('ul').dropdown('toggle');
+	return false;
 }
 
 function set_live_graph(t){
@@ -140,16 +142,11 @@ function set_live_graph(t){
 	return qid;
 }
 
-function close_dropdown(t){
-	$(t).closest('ul').dropdown('toggle');;
-	return false;	
-}
-
 function draw(){
 	if (live_graph != null){
 		var plot = new Plot();
 		_.forEach(graphs, function(graph){
-			plot.add_series(graph.get_data());
+			plot.add_series(graph.get_data(), graph.title);
 			if (plot.title != ''){
 				plot.title += ', ';
 			}

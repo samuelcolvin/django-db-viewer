@@ -2,6 +2,7 @@ import MySQLdb as mdb
 import sqlite3
 from DbInspect._utils import *
 import pandas.io.sql as psql
+import traceback
 
 class _SqlBase(db_comm):
     _con=None
@@ -58,16 +59,24 @@ class _SqlBase(db_comm):
         finally:
             self._close()
             
-    def generate_csv(self, sql):
+    def get_pandas(self, sql):
         try:
             self._con_cur()
-            dbase = psql.frame_query(sql, con=self._con)
-            return self._to_csv(dbase, sql)
+            df = psql.frame_query(sql, con=self._con)
+            return self._sanitize_df(df)
         except Exception, e:
+            traceback.print_exc()
             print "Error: %s" % str(e)
             self._close()
             raise(e)
-                
+            
+    def generate_string(self, sql, string_format='csv'):
+        df = self.get_pandas(sql)
+        return self._to_string(df, sql, string_format)
+    
+    def insert_pandas(self, t_name, df):
+        raise Exception('not implemented')
+        
     def _execute(self, command):
         try:
             self._con_cur()

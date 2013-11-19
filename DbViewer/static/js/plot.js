@@ -5,8 +5,13 @@ function Plot(){
 	this.x_title = 'X';
 	this.y_title = 'Y';
 	
-	this.add_series = function(xy) {
-		data.push({ type : 'line', 'dataPoints': xy });
+	this.add_series = function(xy, series_title) {
+		data.push({ 'type' : 'line', 
+					'dataPoints': xy, 
+					'name': series_title, 
+					'legendText': series_title, 
+					'showInLegend': true
+				});
 	};
 	
 	this.draw = function(){
@@ -37,8 +42,14 @@ function Plot(){
 				titleFontSize: 18,
 				title: this.y_title
 			},
+			legend:{
+				fontColor: 'white',
+				fontSize: 14,
+			},
 			data : data,
 		});
 		chart.render();
+		$('#chart-area').find('button').addClass('btn btn-default');
+		$('#chart-area').find('button').css('margin-left', '10px');
 	};
 }

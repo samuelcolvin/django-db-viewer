@@ -6,6 +6,7 @@ import collections
 import traceback
 import StringIO
 import pandas as pd
+import numpy
 
 class MongoDb(db_comm):
     
@@ -58,17 +59,46 @@ class MongoDb(db_comm):
             return False, error, None
         else:
             return True, result, fields
-            
-    def generate_csv(self, code, ex_type = None):
+        
+    def get_pandas(self, code, ex_type = None):
         try:
             cursor = self._execute(code, ex_type)
-            df =  pd.DataFrame(list(cursor))
-            return self._to_csv(df, code)
+            return pd.DataFrame(list(cursor))
         except Exception, e:
             print "Error: %s" % str(e)
             self._close()
             raise(e)
-        
+            
+    def generate_string(self, code, string_format = 'csv', ex_type = None):
+        df = self.get_pandas(code, ex_type)
+        return self._to_csv(df, code, string_format)
+    
+    def insert_pandas(self, t_name, df):
+        collection = self.db[t_name]
+        columns = list(df.columns)
+        if 'id' in columns:
+            columns[columns.index('id')] = '_id'
+        i = -1
+        int64_col = False
+        for c in df.columns:
+            if df[c].dtype == numpy.int64:
+                int64_col = True
+                break
+        for i, row in enumerate(df.values):
+            row_dict = dict(zip(columns, row))
+            # TODO: surely there should be something better than this
+            if int64_col:
+                for k, v in row_dict.items():
+                    if isinstance(v, numpy.int64):
+                        row_dict[k] = int(v)
+            if i == 0:
+                print '    %r' % row_dict
+                for k, v in row_dict.items():
+                    print '    %s: %s (%s)' % (k, v, type(v))
+            return 0
+            collection.insert(row_dict)
+        return i + 1
+    
     def _execute(self, code, ex_type = None):
         self._code_lines = code.split('\n')
         self._get_other_vars()

@@ -12,7 +12,7 @@ def _csvstr(request):
     qid = int(request.GET['queries'])
     query = m.Query.objects.get(id = qid)
     comms = query.db.get_comms()
-    csvstr = comms.generate_csv(query.code)
+    csvstr = comms.generate_string(query.code)
     return csvstr, query
 
 def generate_csv_zip(request):

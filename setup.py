@@ -3,26 +3,26 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
 import DbInspect
 import DbInspect.pipe as db_pipe
 import DbViewer.models as m
+from time import time
 
 class Funcs(object):
     
     @staticmethod
     def mysql_to_mongo(interactive):
-        tables = ['markets_city', 'markets_currency']# 
+        done_tables = ['markets_article', 'markets_sourceupdate', 'markets_updateattempt']
         source_db = m.Database.objects.get(name='markets')
         dest_db = m.Database.objects.get(name='markets_mongo')
-        
         source_comms = source_db.get_comms()
-        
         dest_comms = dest_db.get_comms()
-        
         tables = []
         for table, _ in source_comms.get_tables()[0]:
-            if table.startswith('markets_'):
+            if table.startswith('markets_') and table not in done_tables:
                 tables.append(table)
         print tables
-        msgs = db_pipe.SQL_to_MongoDB_multiple_complete(source_comms, dest_comms, tables)
-        print '\n'.join(msgs)
+        start = time()
+        db_pipe.SQL_to_MongoDB_multiple_complete(source_comms, dest_comms, tables)
+        diff = time() - start
+        print 'Time taken: %0.3fs' % diff
 
     @staticmethod
     def x_exit_without_doing_anything(interactive):
