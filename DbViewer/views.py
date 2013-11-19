@@ -1,18 +1,17 @@
 from DbViewer.main_page import Main, clear_cache, tree_json
 from django.core.urlresolvers import reverse
-import DbInspect
 import DbViewer.models as m
 import django.views.generic as generic
 import DbViewer.views_base as views_base
 from django.http import HttpResponse
 import StringIO
 import zipfile
+import json
 
 def _csvstr(request):
     qid = int(request.GET['queries'])
     query = m.Query.objects.get(id = qid)
-    Comms = getattr(DbInspect, query.db.db_type.class_name)
-    comms = Comms(dict(query.db.conn_values()))
+    comms = query.db.get_comms()
     csvstr = comms.generate_csv(query.code)
     return csvstr, query
 
@@ -30,6 +29,8 @@ def generate_csv_zip(request):
 
 def generate_csv(request):
     csvstr, _ = _csvstr(request)
+    response = HttpResponse(csvstr, mimetype='text/plain')
+    return response
 
 class Export(views_base.ViewBase, generic.TemplateView):
     template_name = 'export.html'
@@ -46,6 +47,12 @@ class Graph(views_base.ViewBase, generic.TemplateView):
     
     def get_context_data(self, **kw):
         self._context.update(super(Graph, self).get_context_data(**kw))
+        self._context['title'] = 'Graph'
+        self._context['choose_query'] = views_base.FilterChoice(-1)
+        f = ('id', 'name')
+        queries = m.Query.objects.all().values_list(*f)
+        queries = [dict(zip(f, v)) for v in queries]
+        self._context['code_formats'] = json.dumps(queries)
         if 'pop' in self.request.path:
             self._context['base_template'] = 'pop_base.html'
         return self._context

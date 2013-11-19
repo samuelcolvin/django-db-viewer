@@ -191,8 +191,7 @@ class TreeGenerater:
     
     def _get_comms(self, db):
         if db.id not in self.comms:
-            Comms = getattr(DbInspect, db.db_type.class_name)
-            self.comms[db.id] = Comms(dict(db.conn_values()))
+            self.comms[db.id] = db.get_comms()
         return self.comms[db.id]
         
     def _get_tables(self, comms, db):
@@ -205,7 +204,7 @@ class TreeGenerater:
                 if type(value) == dtdt:
                     value = value.strftime(settings.CUSTOM_DT_FORMAT)
                 table['info'][0][1].append((name, value))
-            fields = comms.get_fields(t_name)
+            fields = comms.get_table_fields(t_name)
             table['info'][0][1].append(('Field Count', len(fields)))
             table['fields'] = fields
             for field in fields:

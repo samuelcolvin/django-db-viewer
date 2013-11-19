@@ -1,4 +1,5 @@
 from django.db import models
+import DbInspect
 
 
 class BasicModel(models.Model):
@@ -48,6 +49,10 @@ class Database(BasicModel):
         d.append(('path', self.path))
         d.append(('port', self.port))
         return d
+    
+    def get_comms(self):
+        Comms = getattr(DbInspect, self.db_type.class_name)
+        return Comms(dict(self.conn_values()))
     
     def save(self, *args, **kw):
         super(Database, self).save(*args, **kw)

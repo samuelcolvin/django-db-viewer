@@ -1,8 +1,48 @@
 {% extends base_template %}
 
-{% block content %}	
-	<div class="btn-group">
-	  <a href="{{ request.path }}"><button type="button" class="btn btn-default">Reload</button></a>
+{% block content %}
+	<div class="form-group">
+	    <div class="input-group no-label">
+	      
+						<span class="input-group-addon">X</span>
+						<select id="x_select" class="form-control">
+						</select>
+	    </div><!-- /input-group -->
+	</div>	
+	{% load bootstrap %}
+	<div class="form-group">
+		<button onclick="window.location.href='{{ request.path }}'" type="button" class="btn btn-default">Reload Page</button>
+	</div>
+	<div class="row">
+		{% load bootstrap %}
+		<div class="col-md-6 col-xs-12">
+			<div class="existing-queries form-group">
+			    <div class="input-group no-label">
+			      {{ choose_query |bootstrap }}
+			      <span class="input-group-btn">
+			  		<button id="btn-get-data" class="btn btn-default">Get Data</button>
+			      </span>
+			    </div><!-- /input-group -->
+			</div>
+		</div>
+		<div class="col-md-6 col-xs-12">
+			<div class="row">
+				<div class="col-sm-6 col-xs-12 form-group">
+					<div class="input-group">
+						<span class="input-group-addon">X</span>
+						<select id="x_select" class="form-control">
+						</select>
+					</div>
+				</div>
+				<div class="col-sm-6 col-xs-12 form-group">
+				    <div class="input-group">
+						<span class="input-group-addon">Y</span>
+						<select id="y_select" class="form-control">
+						</select>
+					</div>
+				</div>
+			</div>
+		</div>
 	</div>
 	<div id="chart-area" style="width: 100%;">
     </div>
@@ -15,11 +55,10 @@
 
 {% block extra_js %}	
 	<script src="{% static "js/lib/canvasjs.min.js" %}"></script>
-	<script src="{% static "js/plotting.js" %}"></script>
+	<script src="{% static "js/lib/csvjson.min.js" %}"></script>
 	<script>
-		// var source_names = {{ sources | safe }};
-		// var csv_file = '{{ data_url }}';
-		// var channel_names = {{ channel_names | safe }};
-		$(document).ready(draw);
+		var csv_url = "{% url 'generate_csv' %}";
+		var code_formats = {{ code_formats|safe }};
 	</script>
+	<script src="{% static "js/plotting.js" %}"></script>
 {% endblock %}

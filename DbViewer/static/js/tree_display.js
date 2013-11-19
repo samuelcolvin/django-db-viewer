@@ -17,11 +17,6 @@ function set_editor_format(e){
 $('#id_db').on('change', set_editor_format);
 //$(document).ready(set_editor_format);
 
-function str2html(str){
-	var re = new RegExp('\n', 'g');
-	return '<p>' + str.replace(re,'</p>\n<p>') + '</p>';
-}
-
 $.getJSON($('#tree').attr('data-url'), function(data) {
 	$('#tree').tree({data: data.DATA});
 	if (typeof(data.ERROR) != 'undefined')

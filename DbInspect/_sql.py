@@ -2,7 +2,6 @@ import MySQLdb as mdb
 import sqlite3
 from DbInspect._utils import *
 import pandas.io.sql as psql
-import StringIO
 
 class _SqlBase(db_comm):
     _con=None
@@ -22,8 +21,14 @@ class _SqlBase(db_comm):
         tables, field_names = self._get_tables()
         return tables, field_names
         
-    def get_fields(self, t_name):
-        cur, fields = self._execute_get_descrition('SELECT * FROM %s LIMIT 1' % t_name)
+    def get_table_fields(self, t_name):
+        sql = 'SELECT * FROM %s LIMIT 1' % t_name
+        return self.get_query_fields(sql)
+    
+    def get_query_fields(self, sql, ex_type = None):
+        if 'limit' not in sql.lower():
+            sql += ' LIMIT 1'
+        cur, fields = self._execute_get_descrition(sql)
         values = cur.fetchone()
         if values:
             for field, v in zip(fields, values):
@@ -57,10 +62,7 @@ class _SqlBase(db_comm):
         try:
             self._con_cur()
             dbase = psql.frame_query(sql, con=self._con)
-            file_stream = StringIO.StringIO()
-            dbase.to_csv(file_stream)
-            file_stream.seek(0)
-            return file_stream.getvalue()
+            return self._to_csv(dbase, sql)
         except Exception, e:
             print "Error: %s" % str(e)
             self._close()

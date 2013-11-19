@@ -32,10 +32,16 @@ class MongoDb(db_comm):
         field_names = ('name', 'count')
         return tables, field_names
         
-    def get_fields(self, t_name):
+    def get_table_fields(self, t_name):
         f = self.db[t_name].find_one()
         if f:
             return [(k, type(v).__name__) for k, v in f.items()]
+        return []
+    
+    def get_query_fields(self, code, ex_type = None):
+        cursor = self._execute(code, ex_type)
+        for row in cursor:
+            return [(k, type(v).__name__) for k, v in row.items()]
         return []
     
     def get_values(self, t_name, limit = SIMPLE_LIMIT):
@@ -57,10 +63,7 @@ class MongoDb(db_comm):
         try:
             cursor = self._execute(code, ex_type)
             df =  pd.DataFrame(list(cursor))
-            file_stream = StringIO.StringIO()
-            df.to_csv(file_stream)
-            file_stream.seek(0)
-            return file_stream.getvalue()
+            return self._to_csv(df, code)
         except Exception, e:
             print "Error: %s" % str(e)
             self._close()
@@ -96,7 +99,6 @@ class MongoDb(db_comm):
     
     def _ordered_json(self, text):
         text = text.strip(' \t')
-        print [text]
         if text == '':
             return None
         return json.JSONDecoder(object_pairs_hook=collections.OrderedDict).decode(text)
@@ -109,7 +111,6 @@ class MongoDb(db_comm):
         i = 0
         fields = []
         for row in cursor:
-#             print row
             if i == 0:
                 fields = row.keys()
                 i1 = fields[0]
@@ -183,7 +184,7 @@ class MongoDb(db_comm):
                 break
             line = self._code_lines[i]
             if 'function' in line:
-                endi, name, code = self._process_func(self._code_lines[i:])
+                endi, name, code = process_func(self._code_lines[i:])
                 functions[name] = code
                 i += endi
             i += 1

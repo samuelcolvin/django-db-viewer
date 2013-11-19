@@ -17,3 +17,8 @@ $('.pop-icon').click(function(e){
 	window.open($(this).attr('href'),'name','height=600,width=800');
 	return false;
 });
+
+function str2html(str){
+	var re = new RegExp('\n', 'g');
+	return '<p>' + str.replace(re,'</p>\n<p>') + '</p>';
+}

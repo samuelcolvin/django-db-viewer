@@ -1,5 +1,6 @@
 import re
 import chardet
+import StringIO
 
 MAX_ROWS = 1000
 SIMPLE_LIMIT = 50
@@ -17,6 +18,24 @@ class db_comm(object):
         if len(v2) > 20:
             label = label[:-3] + '...'
         return label
+
+    def _to_csv(self, dataframe, code):
+        fields = self.get_query_fields(code)
+        field_names = [f[0] for f in fields]
+        name_convert = {}
+        for c in dataframe.columns:
+            if dataframe[c].dtype == '<M8[ns]':
+                dataframe[c] = dataframe[c].apply(lambda x: x.strftime('%s'))
+            if c == '':
+                dataframe.drop('', 1)
+            elif c in field_names:
+                i = field_names.index(c)
+                name_convert[c] = '%s (%s)' % (c, fields[i][1])
+        dataframe.rename(columns=name_convert, inplace=True)
+        file_stream = StringIO.StringIO()
+        dataframe.to_csv(file_stream, index=False)
+        # , date_format = '%s' - not yet working in production pandas :-( 
+        return file_stream.getvalue()
     
 def smart_text(s, encoding='utf-8', errors='strict'):
     if isinstance(s, unicode):

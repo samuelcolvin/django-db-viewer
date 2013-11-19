@@ -12,11 +12,9 @@ class Funcs(object):
         source_db = m.Database.objects.get(name='markets')
         dest_db = m.Database.objects.get(name='markets_mongo')
         
-        C = getattr(DbInspect, source_db.db_type.class_name)
-        source_comms = C(dict(source_db.conn_values()))
+        source_comms = source_db.get_comms()
         
-        C = getattr(DbInspect, dest_db.db_type.class_name)
-        dest_comms = C(dict(dest_db.conn_values()))
+        dest_comms = dest_db.get_comms()
         
         tables = []
         for table, _ in source_comms.get_tables()[0]:
