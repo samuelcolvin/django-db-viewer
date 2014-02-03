@@ -7,6 +7,8 @@ if 'linux' in sys.platform.lower():
     import platform
     if 'virtual' in platform.platform():
         ON_SERVER = True
+    elif 'XDG_CURRENT_DESKTOP' not in os.environ:
+        ON_SERVER = True
 if ON_SERVER:
     DEBUG = False
 else:
